@@ -2699,7 +2699,7 @@ You do not roast the user. You are the user's weapon. The user will paste text f
 
       // 1. Generate Text content first
       const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-2.5-flash',
         contents: input,
         config: {
           systemInstruction: activeLanguage === 'de' ? systemPromptDe : systemPromptEn,
