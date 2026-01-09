@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";
 import { GoogleGenAI, Modality } from "@google/genai";
 import { annotate } from "rough-notation";
+import logoImg from "./logo.png";
 import { 
   Coffee,
   Mic,
@@ -176,17 +177,22 @@ const PongLoader = () => {
     const paddleWidth = 12;
     const paddleHeight = 60;
     const ballR = 8;
-    
+    const paddleOffset = 20;
+
     // Y-axis positions (Center vertically initially)
     let playerY = h / 2;
     let aiY = h / 2;
-    
+
     // Initial Ball State
-    let ball = { x: w/2, y: h/2, dx: 4, dy: 3 };
-    
-    // Randomize start direction
-    if (Math.random() < 0.5) ball.dx *= -1;
-    if (Math.random() < 0.5) ball.dy *= -1;
+    const resetBall = () => {
+        return {
+            x: w/2,
+            y: h/2,
+            dx: 3 * (Math.random() > 0.5 ? 1 : -1),
+            dy: 2 * (Math.random() > 0.5 ? 1 : -1)
+        };
+    };
+    let ball = resetBall();
 
     // Helper to draw rounded rects manually for broader compatibility
     const drawRoundedRect = (x: number, y: number, width: number, height: number, radius: number) => {
@@ -206,71 +212,75 @@ const PongLoader = () => {
     };
 
     const loop = () => {
-        // AI Logic: Move towards ball Y
+        // AI Logic: Move towards ball Y with slight delay for fairness
         const target = ball.y;
-        aiY += (target - aiY) * 0.08;
-        
+        const aiSpeed = 0.06;
+        aiY += (target - aiY) * aiSpeed;
+
         // Clamp AI
-        if (aiY < paddleHeight/2) aiY = paddleHeight/2;
-        if (aiY > h - paddleHeight/2) aiY = h - paddleHeight/2;
+        aiY = Math.max(paddleHeight/2, Math.min(h - paddleHeight/2, aiY));
 
         // Physics
         ball.x += ball.dx;
         ball.y += ball.dy;
 
-        // Wall Bounces (Top & Bottom)
-        if (ball.y - ballR < 0 || ball.y + ballR > h) ball.dy *= -1;
+        // Wall Bounces (Top & Bottom) with position correction
+        if (ball.y - ballR < 0) {
+            ball.y = ballR;
+            ball.dy = Math.abs(ball.dy);
+        }
+        if (ball.y + ballR > h) {
+            ball.y = h - ballR;
+            ball.dy = -Math.abs(ball.dy);
+        }
 
-        // Paddles Collisions
-        // Player (Left Side)
-        // Check X range: [20, 20 + paddleWidth]
-        if (ball.dx < 0 && ball.x - ballR < 20 + paddleWidth && ball.x - ballR > 20) {
-            // Check Y range
-            if (ball.y > playerY - paddleHeight/2 - 5 && ball.y < playerY + paddleHeight/2 + 5) {
-                ball.dx = Math.abs(ball.dx); // Bounce Right
-                ball.dy += (ball.y - playerY) * 0.15; // Add spin based on where it hit
-                ball.dx *= 1.05; // Speed up
+        // Player Paddle (Left Side) Collision
+        const playerPaddleRight = paddleOffset + paddleWidth;
+        if (ball.dx < 0 && ball.x - ballR <= playerPaddleRight && ball.x + ballR >= paddleOffset) {
+            if (ball.y >= playerY - paddleHeight/2 - ballR && ball.y <= playerY + paddleHeight/2 + ballR) {
+                ball.x = playerPaddleRight + ballR; // Push ball out
+                ball.dx = Math.abs(ball.dx) * 1.03; // Bounce right, slight speedup
+                const hitOffset = (ball.y - playerY) / (paddleHeight/2);
+                ball.dy += hitOffset * 1.5; // Add spin
             }
         }
-        
-        // AI (Right Side)
-        // Check X range: [w - 20 - paddleWidth, w - 20]
-        if (ball.dx > 0 && ball.x + ballR > w - 20 - paddleWidth && ball.x + ballR < w - 20) {
-            // Check Y range
-            if (ball.y > aiY - paddleHeight/2 - 5 && ball.y < aiY + paddleHeight/2 + 5) {
-                ball.dx = -Math.abs(ball.dx); // Bounce Left
-                ball.dy += (ball.y - aiY) * 0.15; // Add spin
-                ball.dx *= 1.05; // Speed up
+
+        // AI Paddle (Right Side) Collision
+        const aiPaddleLeft = w - paddleOffset - paddleWidth;
+        if (ball.dx > 0 && ball.x + ballR >= aiPaddleLeft && ball.x - ballR <= w - paddleOffset) {
+            if (ball.y >= aiY - paddleHeight/2 - ballR && ball.y <= aiY + paddleHeight/2 + ballR) {
+                ball.x = aiPaddleLeft - ballR; // Push ball out
+                ball.dx = -Math.abs(ball.dx) * 1.03; // Bounce left, slight speedup
+                const hitOffset = (ball.y - aiY) / (paddleHeight/2);
+                ball.dy += hitOffset * 1.5; // Add spin
             }
         }
 
         // Reset if missed (Left or Right walls)
-        if (ball.x < 0 || ball.x > w) {
-            ball.x = w/2;
-            ball.y = h/2;
-            ball.dx = 4 * (Math.random() > 0.5 ? 1 : -1);
-            ball.dy = 3 * (Math.random() > 0.5 ? 1 : -1);
-            // Reset paddle positions slightly
+        if (ball.x < -ballR * 2 || ball.x > w + ballR * 2) {
+            ball = resetBall();
             aiY = h/2;
+            playerY = h/2;
         }
 
         // Cap speed
-        const maxSpeed = 15;
-        if (Math.abs(ball.dx) > maxSpeed) ball.dx = maxSpeed * Math.sign(ball.dx);
-        if (Math.abs(ball.dy) > maxSpeed) ball.dy = maxSpeed * Math.sign(ball.dy);
+        const maxSpeedX = 10;
+        const maxSpeedY = 8;
+        ball.dx = Math.max(-maxSpeedX, Math.min(maxSpeedX, ball.dx));
+        ball.dy = Math.max(-maxSpeedY, Math.min(maxSpeedY, ball.dy));
 
         // Draw
         ctx.clearRect(0, 0, w, h);
-        
+
         ctx.fillStyle = "#2a2a2a";
         ctx.strokeStyle = "#2a2a2a";
         ctx.lineWidth = 2;
 
         // Player Paddle (Left)
-        drawRoundedRect(20, playerY - paddleHeight/2, paddleWidth, paddleHeight, 4);
-        
+        drawRoundedRect(paddleOffset, playerY - paddleHeight/2, paddleWidth, paddleHeight, 4);
+
         // AI Paddle (Right)
-        drawRoundedRect(w - 20 - paddleWidth, aiY - paddleHeight/2, paddleWidth, paddleHeight, 4);
+        drawRoundedRect(w - paddleOffset - paddleWidth, aiY - paddleHeight/2, paddleWidth, paddleHeight, 4);
 
         // Net (Vertical Dashed Line)
         ctx.beginPath();
@@ -280,7 +290,7 @@ const PongLoader = () => {
         ctx.stroke();
         ctx.setLineDash([]);
 
-    // Ball trail
+        // Ball trail
         ctx.fillStyle = "rgba(239, 68, 68, 0.15)";
         ctx.beginPath();
         ctx.arc(ball.x - ball.dx * 2, ball.y - ball.dy * 2, ballR * 0.8, 0, Math.PI*2);
@@ -292,6 +302,7 @@ const PongLoader = () => {
 
         // Ball
         ctx.fillStyle = "#ef4444";
+        ctx.strokeStyle = "#2a2a2a";
         ctx.beginPath();
         ctx.arc(ball.x, ball.y, ballR, 0, Math.PI*2);
         ctx.fill();
@@ -306,16 +317,13 @@ const PongLoader = () => {
     const movePaddle = (clientY: number) => {
         const rect = container.getBoundingClientRect();
         const y = clientY - rect.top;
-        playerY = y;
-        // Clamp player
-        if (playerY < paddleHeight/2) playerY = paddleHeight/2;
-        if (playerY > h - paddleHeight/2) playerY = h - paddleHeight/2;
-    }
+        playerY = Math.max(paddleHeight/2, Math.min(h - paddleHeight/2, y));
+    };
 
     const onTouch = (e: TouchEvent) => {
         e.preventDefault(); // Prevent scrolling while playing
         movePaddle(e.touches[0].clientY);
-    }
+    };
     const onMouse = (e: MouseEvent) => movePaddle(e.clientY);
 
     container.addEventListener('touchmove', onTouch, { passive: false });
@@ -323,12 +331,16 @@ const PongLoader = () => {
 
     // Handle Resize
     const handleResize = () => {
-         w = container.clientWidth;
-         h = container.clientHeight;
-         canvas.width = w * dpr;
-         canvas.height = h * dpr;
-         ctx.scale(dpr, dpr);
-    }
+        w = container.clientWidth;
+        h = container.clientHeight;
+        canvas.width = w * dpr;
+        canvas.height = h * dpr;
+        ctx.scale(dpr, dpr);
+        // Reset game on resize
+        ball = resetBall();
+        playerY = h/2;
+        aiY = h/2;
+    };
     window.addEventListener('resize', handleResize);
 
     return () => {
@@ -509,8 +521,24 @@ const SettingsModal = ({
     setApiKey
 }: any) => {
     const [showKey, setShowKey] = useState(false);
+    const [tempKey, setTempKey] = useState(apiKey);
+    const [saved, setSaved] = useState(false);
+
+    // Sync tempKey when modal opens
+    useEffect(() => {
+        if (isOpen) {
+            setTempKey(apiKey);
+            setSaved(false);
+        }
+    }, [isOpen, apiKey]);
 
     if (!isOpen) return null;
+
+    const handleSaveKey = () => {
+        setApiKey(tempKey);
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+    };
 
     const t = {
         title: language === 'de' ? 'Einstellungen' : 'Settings',
@@ -523,7 +551,9 @@ const SettingsModal = ({
         apiKeyPlaceholder: language === 'de' ? 'Dein API-Schlüssel hier...' : 'Enter your API key here...',
         apiKeyHint: language === 'de' ? 'Hol dir einen Schlüssel bei Google AI Studio' : 'Get a key from Google AI Studio',
         show: language === 'de' ? 'Zeigen' : 'Show',
-        hide: language === 'de' ? 'Verstecken' : 'Hide'
+        hide: language === 'de' ? 'Verstecken' : 'Hide',
+        save: language === 'de' ? 'Speichern' : 'Save',
+        saved: language === 'de' ? 'Gespeichert!' : 'Saved!'
     };
 
     return (
@@ -544,20 +574,33 @@ const SettingsModal = ({
                     {/* API Key Input */}
                     <div className="space-y-2">
                         <label className="font-bold text-gray-600 block">{t.apiKeyLabel}</label>
-                        <div className="relative">
-                            <input
-                                type={showKey ? "text" : "password"}
-                                value={apiKey}
-                                onChange={(e) => setApiKey(e.target.value)}
-                                placeholder={t.apiKeyPlaceholder}
-                                className="w-full p-3 pr-16 border-2 border-gray-200 focus:border-black outline-none font-mono text-sm transition-colors"
-                            />
+                        <div className="flex gap-2">
+                            <div className="relative flex-1">
+                                <input
+                                    type={showKey ? "text" : "password"}
+                                    value={tempKey}
+                                    onChange={(e) => setTempKey(e.target.value)}
+                                    placeholder={t.apiKeyPlaceholder}
+                                    className="w-full p-3 pr-16 border-2 border-gray-200 focus:border-black outline-none font-mono text-sm transition-colors"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowKey(!showKey)}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400 hover:text-black transition-colors px-2 py-1"
+                                >
+                                    {showKey ? t.hide : t.show}
+                                </button>
+                            </div>
                             <button
-                                type="button"
-                                onClick={() => setShowKey(!showKey)}
-                                className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400 hover:text-black transition-colors px-2 py-1"
+                                onClick={handleSaveKey}
+                                disabled={!tempKey.trim() || tempKey === apiKey}
+                                className={`px-4 py-2 font-bold border-2 transition-all ${
+                                    saved
+                                        ? 'bg-green-500 text-white border-green-500'
+                                        : 'bg-black text-white border-black hover:bg-white hover:text-black disabled:opacity-30 disabled:cursor-not-allowed'
+                                }`}
                             >
-                                {showKey ? t.hide : t.show}
+                                {saved ? <Check size={20} /> : t.save}
                             </button>
                         </div>
                         <a
@@ -569,7 +612,7 @@ const SettingsModal = ({
                             {t.apiKeyHint} →
                         </a>
                         {apiKey && (
-                            <div className="text-xs text-green-600 font-bold">● {language === 'de' ? 'Schlüssel gespeichert' : 'Key saved'}</div>
+                            <div className="text-xs text-green-600 font-bold">● {language === 'de' ? 'Schlüssel aktiv' : 'Key active'}</div>
                         )}
                     </div>
 
@@ -1308,7 +1351,7 @@ You do not roast the user. You are the user's weapon. The user will paste text f
       <div className="w-full max-w-2xl relative z-10 my-2 md:my-6">
         
         {/* The Card */}
-        <div className="bg-white wobbly-box p-4 md:p-8 relative">
+        <div className="bg-white wobbly-box p-4 md:p-8 relative overflow-hidden">
 
             {/* Header Controls */}
             <div className="absolute top-4 right-4 flex gap-2 z-30">
@@ -1339,8 +1382,8 @@ You do not roast the user. You are the user's weapon. The user will paste text f
             <div className="mb-2 text-center relative flex flex-col items-center">
                 <div className="relative w-full max-w-lg h-32 md:h-40 flex items-center justify-center">
                     <img
-                        src={`${import.meta.env.BASE_URL}logo.png`}
-                        alt="Jazz's Smartass Silencer" 
+                        src={logoImg}
+                        alt="Jazz's Smartass Silencer"
                         className="w-full h-full object-contain transform -rotate-1 hover:rotate-0 transition-transform duration-300 drop-shadow-sm"
                         onError={(e) => {
                             e.currentTarget.style.display = 'none';
@@ -1349,8 +1392,8 @@ You do not roast the user. You are the user's weapon. The user will paste text f
                         }}
                     />
                     <div id="title-fallback" style={{display: 'none'}} className="w-full h-full">
-                        <ScribbleHeader 
-                            text={language === 'de' ? "Der Rausschmeißer" : "Jazz's Smartass Silencer"} 
+                        <ScribbleHeader
+                            text={language === 'de' ? "Der Rausschmeißer" : "Jazz's Smartass Silencer"}
                             className="w-full h-full" 
                         />
                     </div>
@@ -1482,8 +1525,8 @@ You do not roast the user. You are the user's weapon. The user will paste text f
                 </div>
             </div>
 
-            {/* Onboarding Overlay */}
-            {tourStep !== null && (
+            {/* Onboarding Overlay - Only show on input screen */}
+            {tourStep !== null && step === 'input' && (
                 <OnboardingGuide 
                     step={tourStep}
                     onNext={() => {
