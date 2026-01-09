@@ -196,8 +196,8 @@ const PongLoader = () => {
         return {
             x: w/2,
             y: h/2,
-            dx: 3 * (Math.random() > 0.5 ? 1 : -1),
-            dy: 2 * (Math.random() > 0.5 ? 1 : -1)
+            dx: 5 * (Math.random() > 0.5 ? 1 : -1),
+            dy: 3.5 * (Math.random() > 0.5 ? 1 : -1)
         };
     };
     let ball = resetBall();
@@ -442,8 +442,8 @@ const PongLoader = () => {
   return (
     <div ref={containerRef} className="w-full h-48 md:h-60 wobbly-box bg-white relative overflow-hidden cursor-none touch-none select-none">
         <canvas ref={canvasRef} className="block w-full h-full" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-gray-200 font-black text-6xl pointer-events-none -z-10 select-none opacity-50 rotate-12">
-            PLAY
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-gray-200 font-black text-4xl md:text-5xl pointer-events-none -z-10 select-none opacity-40 rotate-12 text-center">
+            MOVE TO<br />PLAY PONG
         </div>
         <div className="absolute bottom-2 left-2 text-xs text-gray-400 font-bold opacity-50 pointer-events-none">
             YOU
@@ -1455,11 +1455,12 @@ You do not roast the user. You are the user's weapon. The user will paste text f
   };
 
   const reset = () => {
+    stopAudio(); // Stop any playing audio
     setStep('input');
     setInput("");
     setResult("");
-    setIsPlaying(false);
     audioBufferRef.current = null;
+    setBtnHovered(false); // Clear button hover state
   };
 
   const renderResult = () => {
@@ -1613,7 +1614,7 @@ You do not roast the user. You are the user's weapon. The user will paste text f
             {step === 'input' && (
                 <div className="flex flex-col gap-4">
                     <div className="relative">
-                        <div className="mb-2 mt-2 h-16 w-full overflow-visible">
+                        <div className="mb-4 mt-4 h-20 w-full overflow-visible">
                            <ScribbleHeader
                                 text={isRecording
                                     ? (language === 'de' ? "Höre zu..." : "Listening...")
@@ -1724,14 +1725,11 @@ You do not roast the user. You are the user's weapon. The user will paste text f
             
             {/* Footer */}
             <div className="mt-6 pt-4 border-t-2 border-dashed border-gray-200/50 flex flex-col items-center text-center">
-                <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-gray-400 font-bold mb-1">
-                     {language === 'de' ? 'Angetrieben von' : 'Powered by'}
+                <div className="font-bold text-base text-gray-600 rotate-1 mb-2">
+                    {language === 'de' ? 'Kaffee trinken, urteilen' : 'Drinking coffee, passing judgement'}
                 </div>
-                <div className="font-bold text-xl text-gray-600 rotate-1 mb-2">
-                    {language === 'de' ? 'Ethans Ego-Reduktions-Assistent' : "Ethan's Ego Reduction Wizard"}
-                </div>
-                <div className="text-sm text-gray-400 font-bold -rotate-1 decoration-wavy underline decoration-pink-300">
-                    {language === 'de' ? "Benutzung auf eigene Gefahr, du Lauch." : "Use responsibly, you muppet."}
+                <div className="text-sm text-gray-400 font-bold -rotate-1">
+                    {language === 'de' ? 'Verantwortungsvoll nutzen' : 'Use responsibly'}
                 </div>
             </div>
 
