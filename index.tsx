@@ -467,7 +467,7 @@ const RoughHighlight = ({
     );
 };
 
-const CopyButton = ({ text }: { text: string }) => {
+const CopyButton = ({ text, language }: { text: string, language: 'en' | 'de' }) => {
     const [copied, setCopied] = useState(false);
 
     const handleCopy = async (e: React.MouseEvent) => {
@@ -483,10 +483,10 @@ const CopyButton = ({ text }: { text: string }) => {
     };
 
     return (
-        <button 
+        <button
             onClick={handleCopy}
             className={`absolute top-2 right-2 p-3 md:p-2 rounded-full hover:bg-black/5 transition-all duration-200 group z-20 ${copied ? 'animate-pop bg-green-50/50' : 'hover:scale-110 active:scale-90'}`}
-            title="Copy to clipboard"
+            title={language === 'de' ? 'In Zwischenablage kopieren' : 'Copy to clipboard'}
         >
             <div className="relative w-5 h-5">
                 {/* Copy Icon - scales down and rotates out when copied */}
@@ -864,20 +864,22 @@ const OnboardingGuide = ({
 };
 
 
-const ResultSection = ({ 
-    title, 
-    text, 
-    color, 
-    delay, 
+const ResultSection = ({
+    title,
+    text,
+    color,
+    delay,
     headerWidth = "w-48",
-    animationDelay = 0
-}: { 
-    title: string, 
-    text: string, 
-    color: string, 
+    animationDelay = 0,
+    language
+}: {
+    title: string,
+    text: string,
+    color: string,
     delay: number,
     headerWidth?: string,
-    animationDelay?: number
+    animationDelay?: number,
+    language: 'en' | 'de'
 }) => {
     const [hovered, setHovered] = useState(false);
     const [visible, setVisible] = useState(false);
@@ -915,7 +917,7 @@ const ResultSection = ({
                 <div className={`bg-white/50 border border-gray-200 border-dashed rounded-lg p-5 md:p-6 pt-8 text-lg md:text-xl leading-relaxed text-gray-800 relative transition-all duration-300 group-hover:border-transparent group-hover:bg-transparent ${
                     hovered ? 'transform -translate-y-1 shadow-lg' : ''
                 }`}>
-                    <CopyButton text={text} />
+                    <CopyButton text={text} language={language} />
                     <div className="prose prose-lg prose-p:font-hand leading-relaxed">
                         <p>{text}</p>
                     </div>
@@ -1289,7 +1291,7 @@ You do not roast the user. You are the user's weapon. The user will paste text f
         return (
           <div className="bg-white wobbly-input p-6 text-lg md:text-xl leading-relaxed text-gray-800 relative whitespace-pre-wrap">
              {result}
-             <CopyButton text={result} />
+             <CopyButton text={result} language={language} />
           </div>
         );
     }
@@ -1300,7 +1302,7 @@ You do not roast the user. You are the user's weapon. The user will paste text f
         {killShot && (
         <div className="relative group my-2">
              <div className="wobbly-box bg-white border-4 border-black text-black p-6 md:p-8 relative shadow-xl transform rotate-1 transition-transform duration-300">
-                <CopyButton text={killShot} />
+                <CopyButton text={killShot} language={language} />
                 <div className="absolute -bottom-4 left-10 w-8 h-8 bg-white border-r-4 border-b-4 border-black rotate-45"></div>
                 <div className="relative z-10 text-center">
                     <h3 ref={killShotRef} className="text-2xl md:text-4xl font-black leading-snug inline-block">
@@ -1313,24 +1315,26 @@ You do not roast the user. You are the user's weapon. The user will paste text f
 
         {/* The Explanation */}
         {explanation && (
-            <ResultSection 
+            <ResultSection
                 title={language === 'de' ? "Die Obduktion:" : "The Autopsy:"}
-                text={explanation} 
-                color="#ef4444" 
+                text={explanation}
+                color="#ef4444"
                 delay={0}
                 animationDelay={200}
+                language={language}
             />
         )}
 
         {/* Follow Up */}
         {followUp && (
-            <ResultSection 
+            <ResultSection
                 title={language === 'de' ? "Nachfrage:" : "Follow-up Question:"}
-                text={`"${followUp}"`} 
-                color="#2563eb" 
+                text={`"${followUp}"`}
+                color="#2563eb"
                 delay={0.1}
                 headerWidth="w-64"
                 animationDelay={400}
+                language={language}
             />
         )}
       </div>
@@ -1363,20 +1367,20 @@ You do not roast the user. You are the user's weapon. The user will paste text f
             {/* Header Controls */}
             <div className="absolute top-4 right-4 flex gap-2 z-30">
                  {/* Help Button */}
-                <button 
+                <button
                     onClick={() => setTourStep(0)}
                     className="text-gray-400 hover:text-black hover:scale-110 transition-all duration-300"
-                    title="Help & Tour"
+                    title={language === 'de' ? 'Hilfe & Tour' : 'Help & Tour'}
                 >
                     <HelpCircle size={24} />
                 </button>
 
                 {/* Settings Button */}
-                <button 
+                <button
                     ref={settingsBtnRef}
                     onClick={() => setShowSettings(true)}
                     className="text-gray-400 hover:text-black hover:rotate-90 transition-all duration-300"
-                    title="Settings"
+                    title={language === 'de' ? 'Einstellungen' : 'Settings'}
                 >
                     <Settings size={24} />
                 </button>
@@ -1437,11 +1441,11 @@ You do not roast the user. You are the user's weapon. The user will paste text f
                             <button
                                 onClick={toggleRecording}
                                 className={`absolute bottom-3 right-3 p-2 rounded-full transition-all duration-300 z-20 ${
-                                    isRecording 
-                                    ? "text-red-500 animate-pulse" 
+                                    isRecording
+                                    ? "text-red-500 animate-pulse"
                                     : "text-gray-400/50 hover:text-gray-600 hover:opacity-100"
                                 }`}
-                                title="Toggle voice input"
+                                title={language === 'de' ? 'Spracheingabe umschalten' : 'Toggle voice input'}
                             >
                                 {isRecording ? <MicOff size={24} /> : <Mic size={24} />}
                             </button>
@@ -1494,10 +1498,10 @@ You do not roast the user. You are the user's weapon. The user will paste text f
                         <div className="flex items-center gap-4">
                              {/* Re-added Audio Playback Control */}
                              {audioBufferRef.current && (
-                                <button 
-                                    onClick={playAudio} 
+                                <button
+                                    onClick={playAudio}
                                     disabled={isPlaying}
-                                    title={isPlaying ? "Speaking..." : "Listen"}
+                                    title={isPlaying ? (language === 'de' ? 'Spricht...' : 'Speaking...') : (language === 'de' ? 'Anhören' : 'Listen')}
                                     className={`p-2 rounded-full border-2 transition-all ${
                                         isPlaying
                                             ? 'border-green-500 text-green-700 bg-green-50'
