@@ -1494,12 +1494,19 @@ const SettingsModal = ({
         delete: language === 'de' ? 'Löschen' : 'Delete',
     };
 
-    const voiceOptions = [
-        { value: 'default', label: language === 'de' ? 'Standard' : 'Default' },
-        { value: 'fenrir', label: 'Fenrir', disabled: true },
-        { value: 'aoede', label: 'Aoede', disabled: true },
-        { value: 'charon', label: 'Charon', disabled: true },
-    ];
+    const voiceOptions = language === 'de'
+        ? [
+            { value: 'default', label: 'Standard' },
+            { value: 'berlin', label: 'Berlin', desc: 'Direkt & aggressiv' },
+            { value: 'bavarian', label: 'Bayerisch', desc: 'Herablassend & ländlich' },
+            { value: 'hamburg', label: 'Hamburg', desc: 'Kalt & lakonisch' },
+        ]
+        : [
+            { value: 'default', label: 'Default' },
+            { value: 'glaswegian', label: 'Glaswegian', desc: 'Aggressive & rapid-fire' },
+            { value: 'scouse', label: 'Scouse', desc: 'Sharp wit & humiliating' },
+            { value: 'rp', label: 'RP (Posh)', desc: 'Cold & calculated' },
+        ];
 
     const speedOptions = [
         { value: 0.75, label: '0.75x' },
@@ -1614,17 +1621,22 @@ const SettingsModal = ({
                             {/* Voice Selection */}
                             <div className="space-y-2">
                                 <label className="font-bold text-gray-600 block">{t.voiceSelection}</label>
-                                <select
-                                    value={settings.voiceSelection}
-                                    onChange={(e) => updateSettings({ voiceSelection: e.target.value })}
-                                    className="w-full p-3 border-2 border-gray-200 rounded font-bold bg-white focus:border-black outline-none transition-colors"
-                                >
+                                <div className="grid grid-cols-2 gap-2">
                                     {voiceOptions.map((opt) => (
-                                        <option key={opt.value} value={opt.value} disabled={opt.disabled}>
-                                            {opt.label} {opt.disabled ? `(${t.voiceComingSoon})` : ''}
-                                        </option>
+                                        <button
+                                            key={opt.value}
+                                            onClick={() => updateSettings({ voiceSelection: opt.value })}
+                                            className={`p-3 font-bold border-2 transition-all rounded text-left ${
+                                                settings.voiceSelection === opt.value
+                                                    ? 'bg-black text-white border-black'
+                                                    : 'bg-white text-gray-600 border-gray-200 hover:border-black'
+                                            }`}
+                                        >
+                                            <div className="font-black">{opt.label}</div>
+                                            {opt.desc && <div className="text-xs opacity-70 mt-0.5">{opt.desc}</div>}
+                                        </button>
                                     ))}
-                                </select>
+                                </div>
                             </div>
 
                             {/* Playback Speed */}
@@ -2711,11 +2723,27 @@ You do not roast the user. You are the user's weapon. The user will paste text f
         .replace(/\s+/g, ' ')
         .trim();
 
+      // Build voice style instructions based on selected accent
+      const voiceStyles: Record<string, string> = {
+        // English accents
+        'default': 'a cynical, bored British accent',
+        'glaswegian': 'an aggressive, rapid-fire Scottish Glaswegian accent. Sound intimidating and guttural, like you might start a fight',
+        'scouse': 'a sharp, incredulous Liverpudlian Scouse accent. Sound like you cannot believe how stupid they are, with rising pitch for emphasis',
+        'rp': 'a cold, calculated, posh Received Pronunciation accent. Sound like a disappointed headmaster delivering a factual observation of failure',
+        // German accents
+        'berlin': 'einen direkten, aggressiven Berliner Dialekt. Klingt wie ein Maschinengewehr aus Konsonanten, schnell und unverblümt',
+        'bavarian': 'einen herablassenden bayerischen Dialekt. Klingt wie ein selbstgefälliger Wirt der dich für minderwertig hält',
+        'hamburg': 'einen trockenen, lakonischen norddeutschen Hamburger Dialekt. Klingt gelangweilt und emotionslos, wie ein kalter Wind von der Küste',
+      };
+
+      const selectedVoice = settings.voiceSelection || 'default';
+      const voiceStyle = voiceStyles[selectedVoice] || voiceStyles['default'];
+
       let ttsPrompt;
       if (activeLanguage === 'de') {
-        ttsPrompt = `Read the following German response with a bored, cynical tone. Read it naturally as continuous text: ${cleanText}`;
+        ttsPrompt = `Lies die folgende Antwort mit ${voiceStyle}. Lies es natürlich als zusammenhängenden Text: ${cleanText}`;
       } else {
-        ttsPrompt = `Read the following response with a very cynical, bored British accent. Read it naturally as continuous text: ${cleanText}`;
+        ttsPrompt = `Read the following response with ${voiceStyle}. Read it naturally as continuous text: ${cleanText}`;
       }
 
       try {
@@ -2726,7 +2754,7 @@ You do not roast the user. You are the user's weapon. The user will paste text f
                 responseModalities: [Modality.AUDIO],
                 speechConfig: {
                     voiceConfig: {
-                        prebuiltVoiceConfig: { voiceName: 'Fenrir' }, // Fenrir is usually deep/cynical enough
+                        prebuiltVoiceConfig: { voiceName: 'Kore' }, // Kore for versatile accent delivery
                     },
                 },
             },
