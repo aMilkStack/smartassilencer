@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { createRoot } from "react-dom/client";
 import { GoogleGenAI, Modality } from "@google/genai";
 import { annotate } from "rough-notation";
+import html2canvas from "html2canvas";
 import logoImg from "./logo.png";
 import {
   Coffee,
@@ -17,7 +18,7 @@ import {
   X,
   HelpCircle,
   ArrowRight,
-ChevronDown,
+  ChevronDown,
   Globe,
   Volume1,
   VolumeX,
@@ -34,7 +35,9 @@ ChevronDown,
   Sun,
   Moon,
   MessageSquare,
-  RotateCw
+  RotateCw,
+  Share2,
+  Download
 } from "lucide-react";
 
 // --- Sound Effects (Subtle & Pleasant) ---
@@ -106,7 +109,7 @@ const playPopSound = () => {
     oscillator.connect(gainNode);
     gainNode.connect(audioCtx.destination);
 
-oscillator.frequency.setValueAtTime(600, audioCtx.currentTime);
+    oscillator.frequency.setValueAtTime(600, audioCtx.currentTime);
     oscillator.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.05);
     oscillator.type = 'sine';
 
@@ -154,6 +157,93 @@ const playPenScratchSound = () => {
   } catch (e) {}
 };
 
+// Airhorn sound effect - memorable and funny
+const playAirhornSound = () => {
+  try {
+    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+
+    // Create multiple oscillators for that rich airhorn sound
+    const frequencies = [349.23, 440, 523.25]; // F4, A4, C5 - creates a major chord
+
+    frequencies.forEach((freq, i) => {
+      const oscillator = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+
+      oscillator.frequency.setValueAtTime(freq, audioCtx.currentTime);
+      oscillator.type = 'sawtooth';
+
+      // Stagger the starts slightly for that "blaring" effect
+      const startTime = audioCtx.currentTime + (i * 0.02);
+      const duration = 0.5;
+
+      gainNode.gain.setValueAtTime(0, startTime);
+      gainNode.gain.linearRampToValueAtTime(0.15, startTime + 0.05);
+      gainNode.gain.setValueAtTime(0.15, startTime + duration - 0.1);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+
+      oscillator.start(startTime);
+      oscillator.stop(startTime + duration);
+    });
+  } catch (e) {}
+};
+
+// Dramatic reveal sound - builds tension then releases
+const playDramaticRevealSound = () => {
+  try {
+    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+
+    // Rising tone
+    const osc1 = audioCtx.createOscillator();
+    const gain1 = audioCtx.createGain();
+    osc1.connect(gain1);
+    gain1.connect(audioCtx.destination);
+
+    osc1.frequency.setValueAtTime(200, audioCtx.currentTime);
+    osc1.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.3);
+    osc1.type = 'triangle';
+
+    gain1.gain.setValueAtTime(0.1, audioCtx.currentTime);
+    gain1.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
+
+    osc1.start(audioCtx.currentTime);
+    osc1.stop(audioCtx.currentTime + 0.4);
+
+    // Impact hit
+    setTimeout(() => {
+      const osc2 = audioCtx.createOscillator();
+      const gain2 = audioCtx.createGain();
+      osc2.connect(gain2);
+      gain2.connect(audioCtx.destination);
+
+      osc2.frequency.setValueAtTime(150, audioCtx.currentTime);
+      osc2.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.2);
+      osc2.type = 'square';
+
+      gain2.gain.setValueAtTime(0.2, audioCtx.currentTime);
+      gain2.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+
+      osc2.start(audioCtx.currentTime);
+      osc2.stop(audioCtx.currentTime + 0.3);
+    }, 300);
+  } catch (e) {}
+};
+
+// Haptic feedback helper
+const triggerHaptic = (pattern: number | number[] = 50) => {
+  try {
+    if ('vibrate' in navigator) {
+      navigator.vibrate(pattern);
+    }
+  } catch (e) {}
+};
+
+// Strong haptic pattern for impact moments
+const triggerImpactHaptic = () => {
+  triggerHaptic([50, 30, 100, 50, 150]); // Short, pause, medium, pause, long
+};
 // --- Configuration ---
 const LOADING_MESSAGES_EN = [
   "Analysing bullshit...",
@@ -1036,6 +1126,7 @@ const CopyButton = ({ text, language }: { text: string, language: 'en' | 'de' })
         try {
             await navigator.clipboard.writeText(text);
             playPopSound();
+            triggerHaptic(30);
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
         } catch (err) {
@@ -1056,7 +1147,7 @@ const CopyButton = ({ text, language }: { text: string, language: 'en' | 'de' })
                 }`}>
                      <Copy size={20} className="text-gray-400 group-hover:text-black transition-colors" />
                 </div>
-                
+
                 {/* Check Icon - pops in when copied */}
                 <div className={`absolute inset-0 transition-all duration-300 ease-out transform ${
                     copied ? 'opacity-100 scale-100 rotate-0 animate-bounce-once' : 'opacity-0 scale-0 -rotate-12'
@@ -1065,6 +1156,242 @@ const CopyButton = ({ text, language }: { text: string, language: 'en' | 'de' })
                 </div>
             </div>
         </button>
+    );
+};
+
+// Typewriter effect component with blinking cursor
+const TypewriterText = ({
+    text,
+    speed = 30,
+    onComplete,
+    className = "",
+    cursorClassName = ""
+}: {
+    text: string,
+    speed?: number,
+    onComplete?: () => void,
+    className?: string,
+    cursorClassName?: string
+}) => {
+    const [displayedText, setDisplayedText] = useState("");
+    const [isComplete, setIsComplete] = useState(false);
+    const indexRef = useRef(0);
+
+    useEffect(() => {
+        setDisplayedText("");
+        indexRef.current = 0;
+        setIsComplete(false);
+
+        const interval = setInterval(() => {
+            if (indexRef.current < text.length) {
+                setDisplayedText(text.slice(0, indexRef.current + 1));
+                indexRef.current++;
+
+                // Play subtle typing sound every few characters
+                if (indexRef.current % 3 === 0) {
+                    try {
+                        const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+                        const osc = audioCtx.createOscillator();
+                        const gain = audioCtx.createGain();
+                        osc.connect(gain);
+                        gain.connect(audioCtx.destination);
+                        osc.frequency.value = 800 + Math.random() * 200;
+                        osc.type = 'square';
+                        gain.gain.setValueAtTime(0.02, audioCtx.currentTime);
+                        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.02);
+                        osc.start(audioCtx.currentTime);
+                        osc.stop(audioCtx.currentTime + 0.02);
+                    } catch (e) {}
+                }
+            } else {
+                clearInterval(interval);
+                setIsComplete(true);
+                onComplete?.();
+            }
+        }, speed);
+
+        return () => clearInterval(interval);
+    }, [text, speed, onComplete]);
+
+    return (
+        <span className={className}>
+            {displayedText}
+            <span
+                className={`inline-block w-0.5 h-[1em] bg-current ml-0.5 align-middle ${
+                    isComplete ? 'animate-typewriter-cursor' : ''
+                } ${cursorClassName}`}
+                style={{ verticalAlign: 'text-bottom' }}
+            />
+        </span>
+    );
+};
+
+// Share Card Component - generates and shares a styled image
+const ShareCardModal = ({
+    isOpen,
+    onClose,
+    killShot,
+    language
+}: {
+    isOpen: boolean,
+    onClose: () => void,
+    killShot: string,
+    language: 'en' | 'de'
+}) => {
+    const cardRef = useRef<HTMLDivElement>(null);
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [shareUrl, setShareUrl] = useState<string | null>(null);
+
+    const generateImage = useCallback(async () => {
+        if (!cardRef.current) return null;
+
+        setIsGenerating(true);
+        try {
+            const canvas = await html2canvas(cardRef.current, {
+                backgroundColor: '#fffdf5',
+                scale: 2,
+                useCORS: true,
+                logging: false
+            });
+
+            const dataUrl = canvas.toDataURL('image/png');
+            setShareUrl(dataUrl);
+            return dataUrl;
+        } catch (err) {
+            console.error('Failed to generate image', err);
+            return null;
+        } finally {
+            setIsGenerating(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (isOpen && !shareUrl) {
+            // Generate image when modal opens
+            setTimeout(generateImage, 100);
+        }
+    }, [isOpen, shareUrl, generateImage]);
+
+    const handleDownload = async () => {
+        const url = shareUrl || await generateImage();
+        if (!url) return;
+
+        const link = document.createElement('a');
+        link.download = 'smartass-silencer-roast.png';
+        link.href = url;
+        link.click();
+        playPopSound();
+        triggerHaptic(50);
+    };
+
+    const handleShare = async () => {
+        const url = shareUrl || await generateImage();
+        if (!url) return;
+
+        try {
+            // Convert data URL to blob for sharing
+            const response = await fetch(url);
+            const blob = await response.blob();
+            const file = new File([blob], 'smartass-silencer-roast.png', { type: 'image/png' });
+
+            if (navigator.share && navigator.canShare({ files: [file] })) {
+                await navigator.share({
+                    files: [file],
+                    title: language === 'de' ? 'Gnadenschuss vom Smartass Silencer' : 'Kill Shot from Smartass Silencer',
+                    text: killShot
+                });
+                playPopSound();
+            } else {
+                // Fallback: copy to clipboard or download
+                handleDownload();
+            }
+        } catch (err) {
+            if ((err as Error).name !== 'AbortError') {
+                handleDownload();
+            }
+        }
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white wobbly-box p-6 max-w-md w-full relative">
+                <button
+                    onClick={onClose}
+                    className="absolute top-4 right-4 p-2 hover:bg-gray-100 rounded-full transition-colors z-10"
+                >
+                    <X size={24} />
+                </button>
+
+                <h2 className="text-xl font-black mb-4 flex items-center gap-2">
+                    <Share2 size={20} />
+                    {language === 'de' ? 'Als Bild teilen' : 'Share as Image'}
+                </h2>
+
+                {/* The actual card that will be captured */}
+                <div
+                    ref={cardRef}
+                    className="p-6 rounded-lg relative overflow-hidden"
+                    style={{
+                        background: 'linear-gradient(135deg, #fffdf5 0%, #fff8e7 50%, #fffdf5 100%)',
+                        border: '3px solid #2a2a2a',
+                        borderRadius: '255px 15px 225px 15px / 15px 225px 15px 255px'
+                    }}
+                >
+                    {/* Grid background */}
+                    <div
+                        className="absolute inset-0 opacity-20 pointer-events-none"
+                        style={{
+                            backgroundImage: 'linear-gradient(#a3d5ff 1px, transparent 1px), linear-gradient(90deg, #a3d5ff 1px, transparent 1px)',
+                            backgroundSize: '16px 16px'
+                        }}
+                    />
+
+                    {/* Tape effect */}
+                    <div
+                        className="absolute -top-2 left-1/2 -translate-x-1/2 w-20 h-6 bg-pink-200 opacity-80 -rotate-2"
+                        style={{ clipPath: 'polygon(2% 0, 100% 0, 98% 100%, 0% 100%)' }}
+                    />
+
+                    <div className="relative z-10">
+                        <div className="text-center mb-3">
+                            <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+                                {language === 'de' ? 'Gnadenschuss' : 'Kill Shot'}
+                            </span>
+                        </div>
+                        <p className="text-xl md:text-2xl font-black text-center leading-snug">
+                            "{killShot}"
+                        </p>
+                        <div className="mt-4 pt-3 border-t-2 border-dashed border-gray-300 text-center">
+                            <span className="text-xs font-bold text-gray-400">
+                                smartass-silencer.app
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Action buttons */}
+                <div className="flex gap-3 mt-4">
+                    <button
+                        onClick={handleDownload}
+                        disabled={isGenerating}
+                        className="flex-1 p-3 border-2 border-black bg-white font-bold flex items-center justify-center gap-2 hover:bg-gray-100 transition-all disabled:opacity-50"
+                    >
+                        <Download size={18} />
+                        {language === 'de' ? 'Speichern' : 'Download'}
+                    </button>
+                    <button
+                        onClick={handleShare}
+                        disabled={isGenerating}
+                        className="flex-1 p-3 border-2 border-black bg-yellow-300 font-bold flex items-center justify-center gap-2 hover:bg-yellow-400 transition-all disabled:opacity-50"
+                    >
+                        <Share2 size={18} />
+                        {language === 'de' ? 'Teilen' : 'Share'}
+                    </button>
+                </div>
+            </div>
+        </div>
     );
 };
 
@@ -2383,6 +2710,14 @@ const [autoPlay, setAutoPlay] = useState(() => {
     step === 'result' // Only enabled on result screen
   );
 
+  // Page transition & screen shake state
+  const [isShaking, setIsShaking] = useState(false);
+  const [pageTransition, setPageTransition] = useState<'none' | 'flip-out' | 'flip-in' | 'slide-out' | 'slide-in'>('none');
+
+  // Share modal state
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [parsedKillShot, setParsedKillShot] = useState("");
+
   // Initialize Audio Context on user interaction (if possible)
   const initAudioContext = () => {
     if (!audioContextRef.current) {
@@ -2799,20 +3134,40 @@ You do not roast the user. You are the user's weapon. The user will paste text f
       const remainingTime = Math.max(0, minimumLoadingTime - loadingDuration);
 
       setTimeout(() => {
-        setResult(text);
-        playSuccessSound(); // Pleasant chime on result
-        setStep('result');
+        // Start page flip out animation
+        setPageTransition('flip-out');
 
-        // Increment roast counter
-        const newCount = roastCount + 1;
-        setRoastCount(newCount);
-        localStorage.setItem('roast_count', newCount.toString());
+        setTimeout(() => {
+          setResult(text);
+          setStep('result');
+          setPageTransition('flip-in');
 
-        // Auto-play if audio was successfully generated
-        if (autoPlay && audioBufferRef.current) {
-          // Small delay to let the UI settle
-          setTimeout(() => playAudio(), 500);
-        }
+          // Increment roast counter
+          const newCount = roastCount + 1;
+          setRoastCount(newCount);
+          localStorage.setItem('roast_count', newCount.toString());
+
+          // Trigger screen shake + haptic + sounds for dramatic reveal
+          setTimeout(() => {
+            setIsShaking(true);
+            playAirhornSound(); // Memorable airhorn on reveal!
+            triggerImpactHaptic();
+
+            setTimeout(() => {
+              setIsShaking(false);
+              playSuccessSound(); // Follow up with satisfying chime
+            }, 600);
+          }, 200);
+
+          // Clear transition after animation
+          setTimeout(() => setPageTransition('none'), 500);
+
+          // Auto-play if audio was successfully generated
+          if (autoPlay && audioBufferRef.current) {
+            // Delay to let the reveal animation complete
+            setTimeout(() => playAudio(), 1500);
+          }
+        }, 400);
       }, remainingTime);
 
     } catch (e: any) {
@@ -2855,6 +3210,11 @@ You do not roast the user. You are the user's weapon. The user will paste text f
     const explanation = autopsyMatch?.[1]?.trim() || '';
     const followUp = followUpMatch?.[1]?.trim() || '';
 
+    // Update parsed kill shot for sharing
+    if (killShot && killShot !== parsedKillShot) {
+      setParsedKillShot(killShot);
+    }
+
     // Fallback if parsing fails
     if (!killShot && !explanation) {
         return (
@@ -2867,15 +3227,48 @@ You do not roast the user. You are the user's weapon. The user will paste text f
 
     return (
       <div className="flex flex-col gap-10 pb-4">
-        {/* The Kill Shot Bubble */}
+        {/* The Kill Shot Bubble with Typewriter Effect */}
         {killShot && (
         <div className="relative group my-2 animate-bounce-in" style={{ animationDelay: '0.1s', opacity: 0, animationFillMode: 'forwards' }}>
              <div className="wobbly-box bg-white border-4 border-black text-black p-6 md:p-8 relative shadow-xl transform rotate-1 transition-transform duration-300 hover:rotate-0 hover:scale-[1.02]">
-                <CopyButton text={killShot} language={language} />
+                <div className="absolute top-2 right-2 flex gap-1 z-20">
+                    {/* Share Button */}
+                    <button
+                        onClick={() => {
+                            setShowShareModal(true);
+                            playClickSound();
+                            triggerHaptic(30);
+                        }}
+                        className="p-3 md:p-2 rounded-full hover:bg-black/5 transition-all duration-200 hover:scale-110 active:scale-90"
+                        title={language === 'de' ? 'Als Bild teilen' : 'Share as image'}
+                    >
+                        <Share2 size={20} className="text-gray-400 hover:text-black transition-colors" />
+                    </button>
+                    {/* Copy Button - inline version */}
+                    <button
+                        onClick={async (e) => {
+                            e.stopPropagation();
+                            await navigator.clipboard.writeText(killShot);
+                            playPopSound();
+                            triggerHaptic(30);
+                        }}
+                        className="p-3 md:p-2 rounded-full hover:bg-black/5 transition-all duration-200 hover:scale-110 active:scale-90"
+                        title={language === 'de' ? 'In Zwischenablage kopieren' : 'Copy to clipboard'}
+                    >
+                        <Copy size={20} className="text-gray-400 hover:text-black transition-colors" />
+                    </button>
+                </div>
                 <div className="absolute -bottom-4 left-10 w-8 h-8 bg-white border-r-4 border-b-4 border-black rotate-45"></div>
                 <div className="relative z-10 text-center">
                     <h3 ref={killShotRef} className="text-2xl md:text-4xl font-black leading-snug inline-block">
-                        "{killShot}"
+                        "<TypewriterText
+                            text={killShot}
+                            speed={25}
+                            onComplete={() => {
+                                // Extra haptic punch when typewriter completes
+                                triggerHaptic(100);
+                            }}
+                        />"
                     </h3>
                 </div>
              </div>
@@ -2988,11 +3381,18 @@ You do not roast the user. You are the user's weapon. The user will paste text f
         </div>
       )}
 
+      <ShareCardModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        killShot={parsedKillShot}
+        language={language}
+      />
+
       {/* Main Container */}
       <div className="w-full max-w-2xl relative z-10 my-2 md:my-6 px-2">
         
         {/* The Card */}
-        <div className="bg-white wobbly-box p-4 md:p-8 relative">
+        <div className={`bg-white wobbly-box p-4 md:p-8 relative ${isShaking ? 'animate-screen-shake' : ''}`}>
 
             {/* Header Controls */}
             <div className="absolute top-4 right-4 flex gap-2 z-30">
@@ -3089,7 +3489,7 @@ You do not roast the user. You are the user's weapon. The user will paste text f
                     <RoughHighlight show={btnHovered} type="circle" color="#000" padding={10} iterations={1} strokeWidth={2}>
                         <button
                         ref={actionBtnRef}
-                        onClick={() => { playClickSound(); handleSilencer(); }}
+                        onClick={() => { playClickSound(); triggerHaptic(50); handleSilencer(); }}
                         onMouseEnter={() => setBtnHovered(true)}
                         onMouseLeave={() => setBtnHovered(false)}
                         disabled={!input.trim()}
@@ -3109,7 +3509,9 @@ You do not roast the user. You are the user's weapon. The user will paste text f
             )}
 
             {step === 'loading' && (
-                <div className="min-h-[24rem] flex flex-col items-center justify-center gap-6 animate-fade-slide-in">
+                <div className={`min-h-[24rem] flex flex-col items-center justify-center gap-6 ${
+                    pageTransition === 'flip-out' ? 'animate-page-flip-out' : 'animate-fade-slide-in'
+                }`}>
                     {/* Skeleton Phase - shows result structure preview */}
                     <div className={`w-full transition-all duration-500 ${loadingPhase === 'skeleton' ? 'opacity-100 scale-100' : 'opacity-0 scale-95 absolute pointer-events-none'}`}>
                         <ResultSkeleton />
@@ -3129,7 +3531,9 @@ You do not roast the user. You are the user's weapon. The user will paste text f
             )}
 
             {step === 'result' && (
-                <div className="animate-crossfade">
+                <div className={`${
+                    pageTransition === 'flip-in' ? 'animate-page-flip-in' : 'animate-crossfade'
+                }`}>
                     <div className="flex justify-between items-center mb-6 border-b-2 border-dashed border-gray-300 pb-2 animate-bounce-in" style={{ animationDelay: '0.05s', opacity: 0, animationFillMode: 'forwards' }}>
                         <div className="flex flex-col">
                             <div className="flex items-center gap-2 text-2xl font-black text-gray-400 uppercase">
