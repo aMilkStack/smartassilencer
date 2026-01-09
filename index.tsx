@@ -505,8 +505,11 @@ const SettingsModal = ({
     autoPlay,
     setAutoPlay,
     isPlaying,
-    apiKey
+    apiKey,
+    setApiKey
 }: any) => {
+    const [showKey, setShowKey] = useState(false);
+
     if (!isOpen) return null;
 
     const t = {
@@ -516,15 +519,17 @@ const SettingsModal = ({
         lastTransmission: language === 'de' ? 'Letzte Übertragung' : 'Last Transmission',
         replayAudio: language === 'de' ? 'Audio wiederholen' : 'Replay Audio',
         playing: language === 'de' ? 'Spielt ab...' : 'Playing...',
-        apiKeyStatus: language === 'de' ? 'API-Schlüssel Status' : 'API Key Status',
-        active: language === 'de' ? 'Aktiv' : 'Active',
-        missing: language === 'de' ? 'Fehlt (Prüfe .env)' : 'Missing (Check .env)'
+        apiKeyLabel: language === 'de' ? 'Gemini API-Schlüssel' : 'Gemini API Key',
+        apiKeyPlaceholder: language === 'de' ? 'Dein API-Schlüssel hier...' : 'Enter your API key here...',
+        apiKeyHint: language === 'de' ? 'Hol dir einen Schlüssel bei Google AI Studio' : 'Get a key from Google AI Studio',
+        show: language === 'de' ? 'Zeigen' : 'Show',
+        hide: language === 'de' ? 'Verstecken' : 'Hide'
     };
 
     return (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
             <div className="bg-white wobbly-box p-6 md:p-8 max-w-xs md:max-w-sm w-full relative">
-                 <button 
+                 <button
                     onClick={onClose}
                     className="absolute top-4 right-4 p-2 hover:bg-gray-100 rounded-full transition-colors"
                 >
@@ -536,6 +541,38 @@ const SettingsModal = ({
                 </h2>
 
                 <div className="space-y-6">
+                    {/* API Key Input */}
+                    <div className="space-y-2">
+                        <label className="font-bold text-gray-600 block">{t.apiKeyLabel}</label>
+                        <div className="relative">
+                            <input
+                                type={showKey ? "text" : "password"}
+                                value={apiKey}
+                                onChange={(e) => setApiKey(e.target.value)}
+                                placeholder={t.apiKeyPlaceholder}
+                                className="w-full p-3 pr-16 border-2 border-gray-200 focus:border-black outline-none font-mono text-sm transition-colors"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowKey(!showKey)}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400 hover:text-black transition-colors px-2 py-1"
+                            >
+                                {showKey ? t.hide : t.show}
+                            </button>
+                        </div>
+                        <a
+                            href="https://aistudio.google.com/app/apikey"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-blue-500 hover:text-blue-700 underline"
+                        >
+                            {t.apiKeyHint} →
+                        </a>
+                        {apiKey && (
+                            <div className="text-xs text-green-600 font-bold">● {language === 'de' ? 'Schlüssel gespeichert' : 'Key saved'}</div>
+                        )}
+                    </div>
+
                     {/* Language Switch */}
                     <div className="space-y-2">
                         <label className="font-bold text-gray-600 block">{t.languageLabel}</label>
@@ -543,8 +580,8 @@ const SettingsModal = ({
                             <button
                                 onClick={() => setLanguage('en')}
                                 className={`flex-1 p-3 font-bold border-2 transition-all ${
-                                    language === 'en' 
-                                    ? 'bg-black text-white border-black transform -rotate-1 shadow-md' 
+                                    language === 'en'
+                                    ? 'bg-black text-white border-black transform -rotate-1 shadow-md'
                                     : 'bg-white text-gray-400 border-gray-200 hover:border-black'
                                 }`}
                             >
@@ -553,8 +590,8 @@ const SettingsModal = ({
                             <button
                                 onClick={() => setLanguage('de')}
                                 className={`flex-1 p-3 font-bold border-2 transition-all ${
-                                    language === 'de' 
-                                    ? 'bg-black text-white border-black transform rotate-1 shadow-md' 
+                                    language === 'de'
+                                    ? 'bg-black text-white border-black transform rotate-1 shadow-md'
                                     : 'bg-white text-gray-400 border-gray-200 hover:border-black'
                                 }`}
                             >
@@ -566,7 +603,7 @@ const SettingsModal = ({
                     {/* Auto Play Toggle */}
                     <div className="flex items-center justify-between">
                          <label className="font-bold text-gray-600">{t.autoPlayLabel}</label>
-                         <button 
+                         <button
                             onClick={() => setAutoPlay(!autoPlay)}
                             className={`w-14 h-8 rounded-full border-2 border-black flex items-center px-1 transition-all ${
                                 autoPlay ? 'bg-green-400 justify-end' : 'bg-gray-200 justify-start'
@@ -580,24 +617,16 @@ const SettingsModal = ({
                      {hasAudio && (
                         <div className="pt-4 border-t-2 border-dashed border-gray-200">
                              <label className="font-bold text-gray-600 block mb-2">{t.lastTransmission}</label>
-                             <button 
-                                onClick={onPlayAudio} 
+                             <button
+                                onClick={onPlayAudio}
                                 disabled={isPlaying}
                                 className="w-full p-4 border-2 border-black bg-yellow-300 font-black text-lg shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all flex items-center justify-center gap-2 active:shadow-none active:translate-x-[4px] active:translate-y-[4px] disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                <Volume2 size={24} className={isPlaying ? "animate-pulse" : ""} /> 
+                                <Volume2 size={24} className={isPlaying ? "animate-pulse" : ""} />
                                 {isPlaying ? t.playing : t.replayAudio}
                             </button>
                         </div>
                      )}
-
-                     <div className="text-xs text-gray-400 text-center mt-4 font-bold border-t border-gray-100 pt-4">
-                        {t.apiKeyStatus}: {apiKey ? (
-                            <span className="text-green-600">● {t.active}</span>
-                        ) : (
-                            <span className="text-red-500 animate-pulse">● {t.missing}</span>
-                        )}
-                     </div>
                 </div>
             </div>
         </div>
@@ -1107,7 +1136,7 @@ You do not roast the user. You are the user's weapon. The user will paste text f
 
       // 1. Generate Text content first
       const response = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview',
+        model: 'gemini-3-flash-preview',
         contents: input,
         config: {
           systemInstruction: language === 'de' ? systemPromptDe : systemPromptEn,
@@ -1261,8 +1290,8 @@ You do not roast the user. You are the user's weapon. The user will paste text f
   return (
     <div className="min-h-screen relative flex flex-col items-center justify-center p-2 md:p-4 overflow-hidden">
       
-      <SettingsModal 
-        isOpen={showSettings} 
+      <SettingsModal
+        isOpen={showSettings}
         onClose={() => setShowSettings(false)}
         language={language}
         setLanguage={setLanguage}
@@ -1271,7 +1300,8 @@ You do not roast the user. You are the user's weapon. The user will paste text f
         autoPlay={autoPlay}
         setAutoPlay={setAutoPlay}
         isPlaying={isPlaying}
-        apiKey={API_KEY}
+        apiKey={apiKey}
+        setApiKey={setApiKey}
       />
 
       {/* Main Container */}
