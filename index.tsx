@@ -513,13 +513,13 @@ const PongLoader = () => {
   return (
     <div ref={containerRef} className="w-full h-48 md:h-60 wobbly-box bg-white relative overflow-hidden cursor-none touch-none select-none">
         <canvas ref={canvasRef} className="block w-full h-full" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-gray-200 font-black text-4xl md:text-5xl pointer-events-none -z-10 select-none opacity-40 rotate-12 text-center">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-gray-200 heading-xl text-4xl md:text-5xl pointer-events-none -z-10 select-none opacity-40 rotate-12 text-center tracking-tight">
             MOVE TO<br />PLAY PONG
         </div>
-        <div className="absolute bottom-2 left-2 text-xs text-gray-400 font-bold opacity-50 pointer-events-none">
+        <div className="absolute bottom-2 left-2 text-xs text-gray-400 label opacity-50 pointer-events-none tracking-wider">
             YOU
         </div>
-        <div className="absolute top-2 right-2 text-xs text-gray-400 font-bold opacity-50 pointer-events-none">
+        <div className="absolute top-2 right-2 text-xs text-gray-400 label opacity-50 pointer-events-none tracking-wider">
             CPU
         </div>
     </div>
@@ -1067,8 +1067,8 @@ const LanguageSelectionModal = ({
         <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-300">
             <div className="bg-white wobbly-box p-8 md:p-10 max-w-md w-full relative text-center space-y-6">
                 <div className="space-y-2">
-                    <h2 className="text-2xl md:text-3xl font-black">Choose Your Language</h2>
-                    <p className="text-lg md:text-xl font-black">Wähle deine Sprache</p>
+                    <h2 className="text-2xl md:text-3xl heading-lg tracking-tight">Choose Your Language</h2>
+                    <p className="text-lg md:text-xl heading-md">Wähle deine Sprache</p>
                 </div>
 
                 <div className="space-y-3">
@@ -1080,7 +1080,7 @@ const LanguageSelectionModal = ({
                     </button>
                     <button
                         onClick={() => handleSelect('de')}
-                        className="w-full p-4 font-black text-xl bg-white border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[3px] hover:translate-y-[3px] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all active:scale-[0.97] active:shadow-none active:translate-x-[6px] active:translate-y-[6px] hover:bg-yellow-100 btn-press animate-bounce-in-delayed"
+8                        className="w-full p-4 font-black text-xl bg-white border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[3px] hover:translate-y-[3px] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all active:scale-[0.97] active:shadow-none active:translate-x-[6px] active:translate-y-[6px] hover:bg-yellow-100 btn-press animate-bounce-in-delayed"
                         style={{ animationDelay: '0.1s' }}
                     >
                         Deutsch
@@ -1175,14 +1175,14 @@ const SettingsModal = ({
                     <X size={24} />
                 </button>
 
-                <h2 className="text-2xl font-black mb-6 flex items-center gap-2">
+                <h2 className="text-2xl heading-lg tracking-tight mb-6 flex items-center gap-2">
                     <Settings className="animate-spin-slow" /> {t.title}
                 </h2>
 
                 <div className="space-y-6">
                     {/* Language Switch */}
                     <div className="space-y-2">
-                        <label className="font-bold text-gray-600 block">{t.languageLabel}</label>
+                        <label className="label text-sm text-gray-600 block">{t.languageLabel}</label>
                         {step === 'result' && (
                             <div className="text-xs text-amber-600 mb-2 flex items-start gap-1">
                                 <span>⚠️</span>
@@ -1215,7 +1215,7 @@ const SettingsModal = ({
 
                     {/* Auto Play Toggle */}
                     <div className="flex items-center justify-between">
-                         <label className="font-bold text-gray-600">{t.autoPlayLabel}</label>
+                         <label className="label text-sm text-gray-600">{t.autoPlayLabel}</label>
                          <button
                             onClick={() => setAutoPlay(!autoPlay)}
                             className={`w-14 h-8 rounded-full border-2 border-black flex items-center px-1 transition-all ${
@@ -1282,7 +1282,7 @@ const SettingsModal = ({
                      {/* Audio Playback */}
                      {hasAudio && (
                         <div className="pt-4 border-t-2 border-dashed border-gray-200">
-                             <label className="font-bold text-gray-600 block mb-2">{t.lastTransmission}</label>
+                             <label className="label text-sm text-gray-600 block mb-2">{t.lastTransmission}</label>
                              <button
                                 onClick={onPlayAudio}
                                 disabled={isPlaying}
@@ -1300,10 +1300,10 @@ const SettingsModal = ({
             {showLanguageConfirm && (
                 <div className="absolute inset-0 bg-black/70 flex items-center justify-center p-4 z-10">
                     <div className="bg-white wobbly-box p-6 max-w-xs w-full">
-                        <h3 className="text-xl font-black mb-3">
+                        <h3 className="text-xl heading-md tracking-tight mb-3">
                             {language === 'de' ? '⚠️ Sprache wechseln?' : '⚠️ Change Language?'}
                         </h3>
-                        <p className="text-gray-700 mb-4 leading-relaxed">
+                        <p className="text-gray-700 mb-4 body-lg">
                             {language === 'de'
                                 ? 'Das Ergebnis wird neu generiert, um die Antwort und das Audio in der neuen Sprache zu erhalten.'
                                 : 'This will regenerate the result to get the response and audio in the new language.'}
@@ -1489,12 +1489,12 @@ const OnboardingGuide = ({
                             <X size={16} />
                         </button>
 
-                        <h3 className="font-black text-lg mb-2 flex items-center gap-2">
+                        <h3 className="heading-md text-lg tracking-tight mb-2 flex items-center gap-2">
                             <span className="bg-black text-white rounded-full w-6 h-6 flex items-center justify-center text-xs shrink-0">{step + 1}</span>
                             {currentStepData.title}
                         </h3>
-                        
-                        <p className="font-hand text-sm md:text-base leading-tight mb-4 text-gray-800">
+
+                        <p className="font-hand text-sm md:text-base body-md mb-4 text-gray-800">
                             {currentStepData.text}
                         </p>
 
@@ -1567,11 +1567,11 @@ const ResultSection = ({
                 strokeWidth={2} 
                 animationDuration={300}
             >
-                <div className={`bg-white/50 border border-gray-200 border-dashed rounded-lg p-5 md:p-6 pt-8 text-lg md:text-xl leading-relaxed text-gray-800 relative transition-all duration-300 group-hover:border-transparent group-hover:bg-transparent ${
+                <div className={`bg-white/50 border border-gray-200 border-dashed rounded-lg p-5 md:p-6 pt-8 text-lg md:text-xl body-lg text-gray-800 relative transition-all duration-300 group-hover:border-transparent group-hover:bg-transparent ${
                     hovered ? 'transform -translate-y-1 shadow-lg' : ''
                 }`}>
                     <CopyButton text={text} language={language} />
-                    <div className="prose prose-lg prose-p:font-hand leading-relaxed">
+                    <div className="prose prose-lg prose-p:font-hand body-lg">
                         <p>{text}</p>
                     </div>
                 </div>
@@ -2136,7 +2136,7 @@ You do not roast the user. You are the user's weapon. The user will paste text f
                 <CopyButton text={killShot} language={language} />
                 <div className="absolute -bottom-4 left-10 w-8 h-8 bg-white border-r-4 border-b-4 border-black rotate-45"></div>
                 <div className="relative z-10 text-center">
-                    <h3 ref={killShotRef} className="text-2xl md:text-4xl font-black leading-snug inline-block">
+                    <h3 ref={killShotRef} className="text-2xl md:text-4xl heading-xl tracking-tight inline-block">
                         "{killShot}"
                     </h3>
                 </div>
@@ -2304,7 +2304,7 @@ You do not roast the user. You are the user's weapon. The user will paste text f
                                     onChange={(e) => setInput(e.target.value)}
                                     onFocus={() => setInputFocused(true)}
                                     onBlur={() => setInputFocused(false)}
-                                    className={`w-full h-40 wobbly-input p-4 pb-12 text-lg md:text-xl bg-gray-50 focus:bg-white focus:ring-0 outline-none resize-none font-hand text-gray-800 leading-normal shadow-inner placeholder:text-gray-300 relative z-10 transition-all duration-300 ${inputFocused ? 'scale-[1.01] shadow-lg' : ''}`}
+                                    className={`w-full h-40 wobbly-input p-4 pb-12 text-lg md:text-xl body-lg bg-gray-50 focus:bg-white focus:ring-0 outline-none resize-none font-hand text-gray-800 shadow-inner placeholder:text-gray-300 relative z-10 transition-all duration-300 ${inputFocused ? 'scale-[1.01] shadow-lg' : ''}`}
                                     placeholder={language === 'de' ? "z.B. 'Eigentlich ist HTML eine Programmiersprache'" : "e.g. 'Actually, HTML is a programming language'"}
                                 />
                             </RoughHighlight>
@@ -2423,10 +2423,10 @@ You do not roast the user. You are the user's weapon. The user will paste text f
             
             {/* Footer */}
             <div className="mt-6 pt-4 border-t-2 border-dashed border-gray-200/50 flex flex-col items-center text-center">
-                <div className="font-bold text-base text-gray-600 rotate-1 mb-2">
+                <div className="label text-base text-gray-600 rotate-1 mb-2">
                     {language === 'de' ? 'Kaffee trinken, urteilen' : 'Drinking coffee, passing judgement'}
                 </div>
-                <div className="text-sm text-gray-400 font-bold -rotate-1">
+                <div className="text-sm text-gray-400 label -rotate-1">
                     {language === 'de' ? 'Verantwortungsvoll nutzen' : 'Use responsibly'}
                 </div>
             </div>
