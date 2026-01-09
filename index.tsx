@@ -20,54 +20,66 @@ import {
   RotateCw
 } from "lucide-react";
 
-// --- Sound Effects ---
-const createSoundEffect = (frequency: number, duration: number, type: OscillatorType = 'sine', volume: number = 0.1) => {
-  return () => {
-    try {
-      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const oscillator = audioCtx.createOscillator();
-      const gainNode = audioCtx.createGain();
-      
-      oscillator.connect(gainNode);
-      gainNode.connect(audioCtx.destination);
-      
-      oscillator.frequency.value = frequency;
-      oscillator.type = type;
-      
-      gainNode.gain.setValueAtTime(volume, audioCtx.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
-      
-      oscillator.start(audioCtx.currentTime);
-      oscillator.stop(audioCtx.currentTime + duration);
-    } catch (e) {
-      // Silently fail if audio context is not available
-    }
-  };
-};
+// --- Sound Effects (Subtle & Pleasant) ---
 
-const playClickSound = createSoundEffect(800, 0.08, 'square', 0.05);
-const playThwackSound = () => {
+// Soft tactile click - like a gentle button press
+const playClickSound = () => {
   try {
     const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
     const oscillator = audioCtx.createOscillator();
     const gainNode = audioCtx.createGain();
-    
+
     oscillator.connect(gainNode);
     gainNode.connect(audioCtx.destination);
-    
-    // Start with higher freq and drop for "thwack"
-    oscillator.frequency.setValueAtTime(400, audioCtx.currentTime);
-    oscillator.frequency.exponentialRampToValueAtTime(80, audioCtx.currentTime + 0.1);
-    oscillator.type = 'triangle';
-    
-    gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
-    
+
+    // Soft tick: quick sine wave with gentle attack
+    oscillator.frequency.setValueAtTime(1800, audioCtx.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.03);
+    oscillator.type = 'sine';
+
+    gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+    gainNode.gain.linearRampToValueAtTime(0.03, audioCtx.currentTime + 0.005);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.04);
+
     oscillator.start(audioCtx.currentTime);
-    oscillator.stop(audioCtx.currentTime + 0.15);
+    oscillator.stop(audioCtx.currentTime + 0.05);
   } catch (e) {}
 };
 
+// Pleasant success chime - gentle ascending two-note tone
+const playSuccessSound = () => {
+  try {
+    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+
+    // First note (lower)
+    const osc1 = audioCtx.createOscillator();
+    const gain1 = audioCtx.createGain();
+    osc1.connect(gain1);
+    gain1.connect(audioCtx.destination);
+    osc1.frequency.value = 523.25; // C5
+    osc1.type = 'sine';
+    gain1.gain.setValueAtTime(0, audioCtx.currentTime);
+    gain1.gain.linearRampToValueAtTime(0.08, audioCtx.currentTime + 0.02);
+    gain1.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+    osc1.start(audioCtx.currentTime);
+    osc1.stop(audioCtx.currentTime + 0.15);
+
+    // Second note (higher) - slightly delayed
+    const osc2 = audioCtx.createOscillator();
+    const gain2 = audioCtx.createGain();
+    osc2.connect(gain2);
+    gain2.connect(audioCtx.destination);
+    osc2.frequency.value = 659.25; // E5
+    osc2.type = 'sine';
+    gain2.gain.setValueAtTime(0, audioCtx.currentTime + 0.08);
+    gain2.gain.linearRampToValueAtTime(0.08, audioCtx.currentTime + 0.1);
+    gain2.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+    osc2.start(audioCtx.currentTime + 0.08);
+    osc2.stop(audioCtx.currentTime + 0.3);
+  } catch (e) {}
+};
+
+// Soft pop for copy action
 const playPopSound = () => {
   try {
     const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -77,6 +89,13 @@ const playPopSound = () => {
     oscillator.connect(gainNode);
     gainNode.connect(audioCtx.destination);
 
+    oscillator.frequency.setValueAtTime(500, audioCtx.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(900, audioCtx.currentTime + 0.04);
+    oscillator.type = 'sine';
+
+    gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+    gainNode.gain.linearRampToValueAtTime(0.06, audioCtx.currentTime + 0.01);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.08);
     oscillator.frequency.setValueAtTime(600, audioCtx.currentTime);
     oscillator.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.05);
     oscillator.type = 'sine';
@@ -2185,6 +2204,7 @@ You do not roast the user. You are the user's weapon. The user will paste text f
 
       setTimeout(() => {
         setResult(text);
+        playSuccessSound(); // Pleasant chime on result
         playThwackSound(); // Satisfying thwack on result
         triggerHaptic('heavy'); // Satisfying haptic on result
         setStep('result');
@@ -2350,7 +2370,7 @@ You do not roast the user. You are the user's weapon. The user will paste text f
 
       <SettingsModal
         isOpen={showSettings}
-        onClose={() => setShowSettings(false)}
+        onClose={() => { playClickSound(); setShowSettings(false); }}
         language={language}
         setLanguage={setLanguage}
         onPlayAudio={playAudio}
@@ -2374,7 +2394,7 @@ You do not roast the user. You are the user's weapon. The user will paste text f
             <div className="absolute top-4 right-4 flex gap-2 z-30">
                  {/* Help Button */}
                 <button
-                    onClick={() => setTourStep(0)}
+                    onClick={() => { playClickSound(); setTourStep(0); }}
                     className="text-gray-400 hover:text-black hover:scale-110 transition-all duration-300"
                     title={language === 'de' ? 'Hilfe & Tour' : 'Help & Tour'}
                 >
@@ -2384,7 +2404,7 @@ You do not roast the user. You are the user's weapon. The user will paste text f
                 {/* Settings Button */}
                 <button
                     ref={settingsBtnRef}
-                    onClick={() => setShowSettings(true)}
+                    onClick={() => { playClickSound(); setShowSettings(true); }}
                     className="text-gray-400 hover:text-black hover:rotate-90 transition-all duration-300"
                     title={language === 'de' ? 'Einstellungen' : 'Settings'}
                 >
@@ -2447,7 +2467,7 @@ You do not roast the user. You are the user's weapon. The user will paste text f
                             </RoughHighlight>
 
                             <button
-                                onClick={toggleRecording}
+                                onClick={() => { playClickSound(); toggleRecording(); }}
                                 className={`absolute bottom-3 right-3 p-2 rounded-full transition-all duration-300 z-20 ${
                                     isRecording
                                     ? "text-red-500 animate-pulse"
@@ -2532,7 +2552,7 @@ You do not roast the user. You are the user's weapon. The user will paste text f
                              {/* Re-added Audio Playback Control */}
                              {audioBufferRef.current && (
                                 <button
-                                    onClick={playAudio}
+                                    onClick={() => { playClickSound(); playAudio(); }}
                                     disabled={isPlaying}
                                     title={isPlaying ? (language === 'de' ? 'Spricht...' : 'Speaking...') : (language === 'de' ? 'Anhören' : 'Listen')}
                                     className={`p-2 rounded-full border-2 transition-all btn-press animate-bounce-in ${
@@ -2546,6 +2566,8 @@ You do not roast the user. You are the user's weapon. The user will paste text f
                                 </button>
                              )}
 
+                            <button onClick={() => { playClickSound(); reset(); }} className="text-gray-400 hover:text-black font-bold underline decoration-wavy flex items-center gap-1 group">
+                                <PenTool size={16} className="group-hover:rotate-12 transition-transform"/> 
                             <button onClick={reset} className="text-gray-400 hover:text-black font-bold underline decoration-wavy flex items-center gap-1 group btn-press active:scale-95 transition-transform animate-bounce-in" style={{ animationDelay: '0.2s', opacity: 0, animationFillMode: 'forwards' }}>
                                 <PenTool size={16} className="group-hover:rotate-12 transition-transform"/>
                                 {language === 'de' ? "Neues Opfer" : "New Target"}
@@ -2574,16 +2596,17 @@ You do not roast the user. You are the user's weapon. The user will paste text f
 
             {/* Onboarding Overlay - Only show on input screen */}
             {tourStep !== null && step === 'input' && (
-                <OnboardingGuide 
+                <OnboardingGuide
                     step={tourStep}
                     onNext={() => {
+                        playClickSound();
                         if (tourStep < 3) {
                             setTourStep(tourStep + 1);
                         } else {
                             setTourStep(null);
                         }
                     }}
-                    onClose={() => setTourStep(null)}
+                    onClose={() => { playClickSound(); setTourStep(null); }}
                     refs={{
                         settings: settingsBtnRef,
                         input: inputRef,
