@@ -2745,6 +2745,18 @@ You do not roast the user. You are the user's weapon. The user will paste text f
         ttsPrompt = `Read the following response with ${voiceStyle}. Read it naturally as continuous text: ${cleanText}`;
       }
 
+      // Pick voice based on accent - male voices for the aggressive roasts
+      const accentVoices: Record<string, string> = {
+        'default': 'Charon',      // Informative & clear - classic British
+        'glaswegian': 'Fenrir',   // Excitable & dynamic - aggressive Scot
+        'scouse': 'Puck',         // Upbeat & energetic - quick Liverpool wit
+        'rp': 'Sadaltager',       // Authoritative - cold posh headmaster
+        'berlin': 'Orus',         // Firm & decisive - direct Berliner
+        'bavarian': 'Algenib',    // Gravelly - dismissive rural landlord
+        'hamburg': 'Charon',      // Informative & clear - cold Northern
+      };
+      const voiceName = accentVoices[selectedVoice] || 'Charon';
+
       try {
         const audioResponse = await ai.models.generateContent({
             model: "gemini-2.5-flash-preview-tts",
@@ -2753,7 +2765,7 @@ You do not roast the user. You are the user's weapon. The user will paste text f
                 responseModalities: [Modality.AUDIO],
                 speechConfig: {
                     voiceConfig: {
-                        prebuiltVoiceConfig: { voiceName: 'Kore' }, // Kore for versatile accent delivery
+                        prebuiltVoiceConfig: { voiceName },
                     },
                 },
             },
