@@ -183,6 +183,14 @@ const PongLoader = () => {
     let playerY = h / 2;
     let aiY = h / 2;
 
+    // Scores
+    let playerScore = 0;
+    let aiScore = 0;
+    const winningScore = 5;
+    let gameOver = false;
+    let ballPaused = false;
+    let pauseTimeout: number | null = null;
+
     // Initial Ball State
     const resetBall = () => {
         return {
@@ -220,9 +228,11 @@ const PongLoader = () => {
         // Clamp AI
         aiY = Math.max(paddleHeight/2, Math.min(h - paddleHeight/2, aiY));
 
-        // Physics
-        ball.x += ball.dx;
-        ball.y += ball.dy;
+        // Physics (only if ball is not paused)
+        if (!ballPaused && !gameOver) {
+            ball.x += ball.dx;
+            ball.y += ball.dy;
+        }
 
         // Wall Bounces (Top & Bottom) with position correction
         if (ball.y - ballR < 0) {
@@ -256,11 +266,31 @@ const PongLoader = () => {
             }
         }
 
-        // Reset if missed (Left or Right walls)
-        if (ball.x < -ballR * 2 || ball.x > w + ballR * 2) {
-            ball = resetBall();
-            aiY = h/2;
-            playerY = h/2;
+        // Scoring if missed (Left or Right walls)
+        if (ball.x < -ballR * 2) {
+            // AI scored (ball went past player)
+            aiScore++;
+            if (aiScore >= winningScore) {
+                gameOver = true;
+            } else {
+                ball = resetBall();
+                ballPaused = true;
+                pauseTimeout = window.setTimeout(() => {
+                    ballPaused = false;
+                }, 1000);
+            }
+        } else if (ball.x > w + ballR * 2) {
+            // Player scored (ball went past AI)
+            playerScore++;
+            if (playerScore >= winningScore) {
+                gameOver = true;
+            } else {
+                ball = resetBall();
+                ballPaused = true;
+                pauseTimeout = window.setTimeout(() => {
+                    ballPaused = false;
+                }, 1000);
+            }
         }
 
         // Cap speed
@@ -308,6 +338,35 @@ const PongLoader = () => {
         ctx.fill();
         ctx.stroke();
 
+        // Draw Scores
+        ctx.fillStyle = "#2a2a2a";
+        ctx.font = "bold 32px 'Gochi Hand', cursive";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "top";
+
+        // Player score (left side)
+        ctx.fillText(playerScore.toString(), w / 4, 20);
+
+        // AI score (right side)
+        ctx.fillText(aiScore.toString(), (w * 3) / 4, 20);
+
+        // Game Over message
+        if (gameOver) {
+            ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+            ctx.fillRect(0, 0, w, h);
+
+            ctx.fillStyle = "#fff";
+            ctx.font = "bold 48px 'Gochi Hand', cursive";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+
+            const winner = playerScore >= winningScore ? "YOU WIN!" : "CPU WINS!";
+            ctx.fillText(winner, w / 2, h / 2 - 20);
+
+            ctx.font = "bold 20px 'Gochi Hand', cursive";
+            ctx.fillText("Tap to restart", w / 2, h / 2 + 30);
+        }
+
         animationId = requestAnimationFrame(loop);
     };
 
@@ -315,6 +374,7 @@ const PongLoader = () => {
 
     // Interaction Handlers
     const movePaddle = (clientY: number) => {
+        if (gameOver) return; // Don't move paddle when game is over
         const rect = container.getBoundingClientRect();
         const y = clientY - rect.top;
         playerY = Math.max(paddleHeight/2, Math.min(h - paddleHeight/2, y));
@@ -322,12 +382,38 @@ const PongLoader = () => {
 
     const onTouch = (e: TouchEvent) => {
         e.preventDefault(); // Prevent scrolling while playing
-        movePaddle(e.touches[0].clientY);
+        if (gameOver) {
+            // Restart game
+            playerScore = 0;
+            aiScore = 0;
+            gameOver = false;
+            ball = resetBall();
+            playerY = h/2;
+            aiY = h/2;
+            ballPaused = false;
+        } else {
+            movePaddle(e.touches[0].clientY);
+        }
     };
+
     const onMouse = (e: MouseEvent) => movePaddle(e.clientY);
+
+    const onClick = () => {
+        if (gameOver) {
+            // Restart game
+            playerScore = 0;
+            aiScore = 0;
+            gameOver = false;
+            ball = resetBall();
+            playerY = h/2;
+            aiY = h/2;
+            ballPaused = false;
+        }
+    };
 
     container.addEventListener('touchmove', onTouch, { passive: false });
     container.addEventListener('mousemove', onMouse);
+    container.addEventListener('click', onClick);
 
     // Handle Resize
     const handleResize = () => {
@@ -345,8 +431,10 @@ const PongLoader = () => {
 
     return () => {
         cancelAnimationFrame(animationId);
+        if (pauseTimeout) clearTimeout(pauseTimeout);
         container.removeEventListener('touchmove', onTouch);
         container.removeEventListener('mousemove', onMouse);
+        container.removeEventListener('click', onClick);
         window.removeEventListener('resize', handleResize);
     };
   }, []);
@@ -1191,6 +1279,9 @@ const [loadingMsg, setLoadingMsg] = useState(LOADING_MESSAGES_EN[0]);
     setResult("");
     audioBufferRef.current = null; // Reset previous audio
 
+    // Track when loading started to ensure minimum animation time
+    const loadingStartTime = Date.now();
+
     try {
       const ai = new GoogleGenAI({ apiKey: apiKey });
       
@@ -1304,15 +1395,22 @@ You do not roast the user. You are the user's weapon. The user will paste text f
       }
 
       // 3. Show Result & Play Audio
-      setResult(text);
-      playThwackSound(); // Satisfying thwack on result
-      setStep('result');
-      
-      // Auto-play if audio was successfully generated
-      if (autoPlay && audioBufferRef.current) {
-        // Small delay to let the UI settle
-        setTimeout(() => playAudio(), 500);
-      }
+      // Ensure minimum loading time of 1.5s so animation completes
+      const loadingDuration = Date.now() - loadingStartTime;
+      const minimumLoadingTime = 1500; // 1.5 seconds
+      const remainingTime = Math.max(0, minimumLoadingTime - loadingDuration);
+
+      setTimeout(() => {
+        setResult(text);
+        playThwackSound(); // Satisfying thwack on result
+        setStep('result');
+
+        // Auto-play if audio was successfully generated
+        if (autoPlay && audioBufferRef.current) {
+          // Small delay to let the UI settle
+          setTimeout(() => playAudio(), 500);
+        }
+      }, remainingTime);
 
     } catch (e: any) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -1463,11 +1561,11 @@ You do not roast the user. You are the user's weapon. The user will paste text f
             </div>
 
             {/* Tape Effect */}
-            <div className="absolute -top-4 left-1/2 -translate-x-1/2 w-32 h-8 bg-pink-200 opacity-80 -rotate-1 shadow-sm" style={{clipPath: 'polygon(2% 0, 100% 0, 98% 100%, 0% 100%)'}}></div>
+            <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-32 h-8 bg-pink-200 opacity-80 -rotate-1 shadow-sm z-20" style={{clipPath: 'polygon(2% 0, 100% 0, 98% 100%, 0% 100%)'}}></div>
 
             {/* Title Section */}
-            <div className="mb-6 text-center relative flex flex-col items-center">
-                <div className="relative w-full h-48 md:h-64 flex items-center justify-center px-4">
+            <div className="mb-6 mt-2 text-center relative flex flex-col items-center">
+                <div className="relative w-full h-52 md:h-72 flex items-center justify-center px-2">
                     <img
                         src={logoImg}
                         alt="Jazz's Smartass Silencer"
