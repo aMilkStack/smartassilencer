@@ -3073,9 +3073,6 @@ You do not roast the user. You are the user's weapon. The user will paste text f
                         <h2 className="text-3xl font-black animate-bounce min-h-[4rem] flex items-center justify-center px-4">
                             {loadingMsg}
                         </h2>
-                        <p className="text-gray-500 font-bold mt-2 animate-fade-slide-in" style={{ animationDelay: '0.3s' }}>
-                             {language === 'de' ? "Tee trinken, Fehler verurteilen." : "Sipping tea, judging errors."}
-                        </p>
                     </div>
                 </div>
             )}
@@ -3125,7 +3122,7 @@ You do not roast the user. You are the user's weapon. The user will paste text f
             {/* Footer */}
             <div className="mt-6 pt-4 border-t-2 border-dashed border-gray-200/50 flex flex-col items-center text-center">
                 <div className="font-bold text-base text-gray-600 rotate-1 mb-2">
-                    {language === 'de' ? 'Kaffee trinken, urteilen' : 'Drinking coffee, passing judgement'}
+                    {language === 'de' ? 'Angetrieben von Rational-Emotiver Verhaltenstherapie - und Dexies' : 'Powered by Rational Emotive Behavior Therapy - and dexies'}
                 </div>
                 <div className="text-sm text-gray-400 font-bold -rotate-1">
                     {language === 'de' ? 'Verantwortungsvoll nutzen' : 'Use responsibly'}
