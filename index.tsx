@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { createRoot } from "react-dom/client";
 import { GoogleGenAI, Modality } from "@google/genai";
 import { annotate } from "rough-notation";
 import logoImg from "./logo.png";
-import { 
+import {
   Coffee,
   Mic,
   Glasses,
@@ -16,8 +16,87 @@ import {
   Settings,
   X,
   HelpCircle,
-  ArrowRight
+  ArrowRight,
+  Square
 } from "lucide-react";
+
+// --- Focus Trap Hook for Modals ---
+const useFocusTrap = (isActive: boolean, containerRef: React.RefObject<HTMLElement | null>) => {
+  const previousActiveElement = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!isActive || !containerRef.current) return;
+
+    // Save the previously focused element
+    previousActiveElement.current = document.activeElement as HTMLElement;
+
+    // Get all focusable elements within the container
+    const getFocusableElements = (): HTMLElement[] => {
+      if (!containerRef.current) return [];
+      const elements = containerRef.current.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      return Array.from(elements).filter(
+        (el: HTMLElement) => !el.hasAttribute('disabled') && el.offsetParent !== null
+      );
+    };
+
+    // Focus the first focusable element
+    const focusableElements = getFocusableElements();
+    if (focusableElements.length > 0) {
+      focusableElements[0].focus();
+    }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+
+      const focusables = getFocusableElements();
+      if (focusables.length === 0) return;
+
+      const firstElement = focusables[0];
+      const lastElement = focusables[focusables.length - 1];
+
+      if (e.shiftKey) {
+        if (document.activeElement === firstElement) {
+          e.preventDefault();
+          lastElement.focus();
+        }
+      } else {
+        if (document.activeElement === lastElement) {
+          e.preventDefault();
+          firstElement.focus();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      // Return focus to previous element
+      if (previousActiveElement.current) {
+        previousActiveElement.current.focus();
+      }
+    };
+  }, [isActive, containerRef]);
+};
+
+// --- Escape Key Hook for Modals ---
+const useEscapeKey = (isActive: boolean, onEscape: () => void) => {
+  useEffect(() => {
+    if (!isActive) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onEscape();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isActive, onEscape]);
+};
 
 // --- Sound Effects ---
 const createSoundEffect = (frequency: number, duration: number, type: OscillatorType = 'sine', volume: number = 0.1) => {
@@ -440,59 +519,79 @@ const PongLoader = () => {
   }, []);
 
   return (
-    <div ref={containerRef} className="w-full h-48 md:h-60 wobbly-box bg-white relative overflow-hidden cursor-none touch-none select-none">
-        <canvas ref={canvasRef} className="block w-full h-full" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-gray-200 font-black text-4xl md:text-5xl pointer-events-none -z-10 select-none opacity-40 rotate-12 text-center">
+    <div
+      ref={containerRef}
+      className="w-full h-48 md:h-60 wobbly-box bg-white relative overflow-hidden cursor-none touch-none select-none"
+      role="application"
+      aria-label="Pong game - move your mouse or finger to control the left paddle. Score 5 points to win."
+      tabIndex={0}
+    >
+        <canvas
+          ref={canvasRef}
+          className="block w-full h-full"
+          aria-hidden="true"
+        />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-gray-200 font-black text-4xl md:text-5xl pointer-events-none -z-10 select-none opacity-40 rotate-12 text-center" aria-hidden="true">
             MOVE TO<br />PLAY PONG
         </div>
-        <div className="absolute bottom-2 left-2 text-xs text-gray-400 font-bold opacity-50 pointer-events-none">
+        <div className="absolute bottom-2 left-2 text-xs text-gray-400 font-bold opacity-50 pointer-events-none" aria-hidden="true">
             YOU
         </div>
-        <div className="absolute top-2 right-2 text-xs text-gray-400 font-bold opacity-50 pointer-events-none">
+        <div className="absolute top-2 right-2 text-xs text-gray-400 font-bold opacity-50 pointer-events-none" aria-hidden="true">
             CPU
         </div>
+        {/* Screen reader alternative */}
+        <span className="sr-only">
+          Interactive Pong game loading indicator. Move mouse or touch to control left paddle.
+        </span>
     </div>
   );
 };
 
 
 // Reusable Scribble Text (SVG Animation)
-const ScribbleHeader = ({ 
-    text, 
-    className = "", 
+const ScribbleHeader = ({
+    text,
+    className = "",
     delay = 0,
-    color = "#2a2a2a"
-}: { 
-    text: string, 
-    className?: string, 
+    color = "#2a2a2a",
+    as: Component = "h2"
+}: {
+    text: string,
+    className?: string,
     delay?: number,
-    color?: string 
+    color?: string,
+    as?: "h1" | "h2" | "h3" | "h4" | "span" | "p"
 }) => {
   return (
-    <div className={`relative ${className} overflow-visible`} aria-label={text}>
-        <svg 
-          viewBox="0 0 400 60" 
+    <div className={`relative ${className} overflow-visible`} role="presentation">
+        {/* Visually hidden heading for screen readers */}
+        <Component className="sr-only">{text}</Component>
+        <svg
+          viewBox="0 0 400 60"
           className="w-full h-full scribble-text pointer-events-none overflow-visible"
           preserveAspectRatio="xMidYMid meet"
+          aria-hidden="true"
+          role="img"
         >
-          <text 
-            x="50%" 
-            y="70%" 
-            textAnchor="middle" 
-            style={{ 
-                fontFamily: '"Gochi Hand", cursive', 
+          <text
+            x="50%"
+            y="70%"
+            textAnchor="middle"
+            style={{
+                fontFamily: '"Gochi Hand", cursive',
                 fontWeight: 900,
                 fontSize: '40px',
                 stroke: color,
-                fill: 'transparent' // Filled via CSS animation
+                fill: 'transparent'
             }}
           >
             {text.split('').map((char, i) => (
-              <tspan 
-                key={i} 
-                style={{ 
+              <tspan
+                key={i}
+                style={{
                     animationDelay: `${delay + (i * 0.05)}s`,
-                    fill: 'transparent' // Override to ensure animation controls fill
+                    fill: 'transparent'
                 }}
               >
                 {char}
@@ -557,6 +656,8 @@ const RoughHighlight = ({
 
 const CopyButton = ({ text, language }: { text: string, language: 'en' | 'de' }) => {
     const [copied, setCopied] = useState(false);
+    const copyLabel = language === 'de' ? 'In Zwischenablage kopieren' : 'Copy to clipboard';
+    const copiedLabel = language === 'de' ? 'Kopiert!' : 'Copied!';
 
     const handleCopy = async (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -573,17 +674,18 @@ const CopyButton = ({ text, language }: { text: string, language: 'en' | 'de' })
     return (
         <button
             onClick={handleCopy}
-            className={`absolute top-2 right-2 p-3 md:p-2 rounded-full hover:bg-black/5 transition-all duration-200 group z-20 ${copied ? 'animate-pop bg-green-50/50' : 'hover:scale-110 active:scale-90'}`}
-            title={language === 'de' ? 'In Zwischenablage kopieren' : 'Copy to clipboard'}
+            className={`absolute top-2 right-2 p-3 min-w-[44px] min-h-[44px] rounded-full hover:bg-black/5 transition-all duration-200 group z-20 flex items-center justify-center ${copied ? 'animate-pop bg-green-50/50' : 'hover:scale-110 active:scale-90'}`}
+            aria-label={copied ? copiedLabel : copyLabel}
+            aria-live="polite"
         >
-            <div className="relative w-5 h-5">
+            <div className="relative w-5 h-5" aria-hidden="true">
                 {/* Copy Icon - scales down and rotates out when copied */}
                 <div className={`absolute inset-0 transition-all duration-300 ease-out transform ${
                     copied ? 'opacity-0 scale-50 rotate-12' : 'opacity-100 scale-100 rotate-0'
                 }`}>
                      <Copy size={20} className="text-gray-400 group-hover:text-black transition-colors" />
                 </div>
-                
+
                 {/* Check Icon - pops in when copied */}
                 <div className={`absolute inset-0 transition-all duration-300 ease-out transform ${
                     copied ? 'opacity-100 scale-100 rotate-0 animate-bounce-once' : 'opacity-0 scale-0 -rotate-12'
@@ -602,6 +704,11 @@ const LanguageSelectionModal = ({
     isOpen: boolean;
     onSelectLanguage: (lang: 'en' | 'de') => void;
 }) => {
+    const modalRef = useRef<HTMLDivElement>(null);
+
+    // Focus trap and escape key handling
+    useFocusTrap(isOpen, modalRef);
+
     if (!isOpen) return null;
 
     const handleSelect = (lang: 'en' | 'de') => {
@@ -611,23 +718,37 @@ const LanguageSelectionModal = ({
     };
 
     return (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-300">
-            <div className="bg-white wobbly-box p-8 md:p-10 max-w-md w-full relative text-center space-y-6">
+        <div
+            className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-300"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="language-modal-title"
+        >
+            <div
+                ref={modalRef}
+                className="bg-white wobbly-box p-8 md:p-10 max-w-md w-full relative text-center space-y-6"
+            >
                 <div className="space-y-2">
-                    <h2 className="text-2xl md:text-3xl font-black">Choose Your Language</h2>
-                    <p className="text-lg md:text-xl font-black">Wähle deine Sprache</p>
+                    <h2 id="language-modal-title" className="text-2xl md:text-3xl font-black">
+                        Choose Your Language
+                    </h2>
+                    <p className="text-lg md:text-xl font-black" aria-hidden="true">
+                        Wähle deine Sprache
+                    </p>
                 </div>
 
-                <div className="space-y-3">
+                <div className="space-y-3" role="group" aria-label="Language selection">
                     <button
                         onClick={() => handleSelect('en')}
-                        className="w-full p-4 font-black text-xl bg-white border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[3px] hover:translate-y-[3px] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all active:shadow-none active:translate-x-[6px] active:translate-y-[6px] hover:bg-yellow-100"
+                        className="w-full p-4 min-h-[56px] font-black text-xl bg-white border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[3px] hover:translate-y-[3px] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all active:shadow-none active:translate-x-[6px] active:translate-y-[6px] hover:bg-yellow-100"
+                        aria-label="Select English language"
                     >
                         English
                     </button>
                     <button
                         onClick={() => handleSelect('de')}
-                        className="w-full p-4 font-black text-xl bg-white border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[3px] hover:translate-y-[3px] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all active:shadow-none active:translate-x-[6px] active:translate-y-[6px] hover:bg-yellow-100"
+                        className="w-full p-4 min-h-[56px] font-black text-xl bg-white border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[3px] hover:translate-y-[3px] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all active:shadow-none active:translate-x-[6px] active:translate-y-[6px] hover:bg-yellow-100"
+                        aria-label="Sprache Deutsch auswählen (Select German language)"
                     >
                         Deutsch
                     </button>
@@ -652,6 +773,22 @@ const SettingsModal = ({
 }: any) => {
     const [showLanguageConfirm, setShowLanguageConfirm] = useState(false);
     const [pendingLanguage, setPendingLanguage] = useState<'en' | 'de' | null>(null);
+    const modalRef = useRef<HTMLDivElement>(null);
+    const confirmModalRef = useRef<HTMLDivElement>(null);
+
+    // Focus trap and escape key handling
+    const handleClose = useCallback(() => {
+        if (showLanguageConfirm) {
+            setShowLanguageConfirm(false);
+            setPendingLanguage(null);
+        } else {
+            onClose();
+        }
+    }, [showLanguageConfirm, onClose]);
+
+    useFocusTrap(isOpen && !showLanguageConfirm, modalRef);
+    useFocusTrap(showLanguageConfirm, confirmModalRef);
+    useEscapeKey(isOpen, handleClose);
 
     if (!isOpen) return null;
 
@@ -688,80 +825,107 @@ const SettingsModal = ({
         autoPlayLabel: language === 'de' ? 'Beleidigungen automatisch abspielen' : 'Auto-play Insults',
         lastTransmission: language === 'de' ? 'Letzte Übertragung' : 'Last Transmission',
         replayAudio: language === 'de' ? 'Audio wiederholen' : 'Replay Audio',
-        playing: language === 'de' ? 'Spielt ab...' : 'Playing...'
+        playing: language === 'de' ? 'Spielt ab...' : 'Playing...',
+        closeSettings: language === 'de' ? 'Einstellungen schließen' : 'Close settings'
     };
 
+    const autoPlayId = "autoplay-toggle";
+    const languageGroupId = "language-selection";
+
     return (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-white wobbly-box p-6 md:p-8 max-w-xs md:max-w-sm w-full relative">
+        <div
+            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="settings-modal-title"
+        >
+            <div
+                ref={modalRef}
+                className="bg-white wobbly-box p-6 md:p-8 max-w-xs md:max-w-sm w-full relative"
+            >
                  <button
                     onClick={onClose}
-                    className="absolute top-4 right-4 p-2 hover:bg-gray-100 rounded-full transition-colors"
+                    className="absolute top-4 right-4 p-2 min-w-[44px] min-h-[44px] hover:bg-gray-100 rounded-full transition-colors flex items-center justify-center"
+                    aria-label={t.closeSettings}
                 >
-                    <X size={24} />
+                    <X size={24} aria-hidden="true" />
                 </button>
 
-                <h2 className="text-2xl font-black mb-6 flex items-center gap-2">
-                    <Settings className="animate-spin-slow" /> {t.title}
+                <h2 id="settings-modal-title" className="text-2xl font-black mb-6 flex items-center gap-2">
+                    <Settings className="animate-spin-slow" aria-hidden="true" /> {t.title}
                 </h2>
 
                 <div className="space-y-6">
                     {/* Language Switch */}
-                    <div className="space-y-2">
-                        <label className="font-bold text-gray-600 block">{t.languageLabel}</label>
+                    <fieldset className="space-y-2">
+                        <legend id={languageGroupId} className="font-bold text-gray-600 block">{t.languageLabel}</legend>
                         {step === 'result' && (
-                            <div className="text-xs text-amber-600 mb-2 flex items-start gap-1">
-                                <span>⚠️</span>
+                            <div className="text-xs text-amber-700 mb-2 flex items-start gap-1" role="alert">
+                                <span aria-hidden="true">⚠️</span>
                                 <span>{language === 'de' ? 'Sprachwechsel erzeugt neues Ergebnis' : 'Changing language will regenerate result'}</span>
                             </div>
                         )}
-                        <div className="flex gap-2">
+                        <div className="flex gap-2" role="radiogroup" aria-labelledby={languageGroupId}>
                             <button
                                 onClick={() => handleLanguageChange('en')}
-                                className={`flex-1 p-3 font-bold border-2 transition-all ${
+                                className={`flex-1 p-3 min-h-[48px] font-bold border-2 transition-all ${
                                     language === 'en'
                                     ? 'bg-black text-white border-black transform -rotate-1 shadow-md'
-                                    : 'bg-white text-gray-400 border-gray-200 hover:border-black'
+                                    : 'bg-white text-gray-600 border-gray-300 hover:border-black'
                                 }`}
+                                role="radio"
+                                aria-checked={language === 'en'}
+                                aria-label="English"
                             >
                                 English
                             </button>
                             <button
                                 onClick={() => handleLanguageChange('de')}
-                                className={`flex-1 p-3 font-bold border-2 transition-all ${
+                                className={`flex-1 p-3 min-h-[48px] font-bold border-2 transition-all ${
                                     language === 'de'
                                     ? 'bg-black text-white border-black transform rotate-1 shadow-md'
-                                    : 'bg-white text-gray-400 border-gray-200 hover:border-black'
+                                    : 'bg-white text-gray-600 border-gray-300 hover:border-black'
                                 }`}
+                                role="radio"
+                                aria-checked={language === 'de'}
+                                aria-label="Deutsch"
                             >
                                 Deutsch
                             </button>
                         </div>
-                    </div>
+                    </fieldset>
 
                     {/* Auto Play Toggle */}
                     <div className="flex items-center justify-between">
-                         <label className="font-bold text-gray-600">{t.autoPlayLabel}</label>
+                         <label htmlFor={autoPlayId} className="font-bold text-gray-600 cursor-pointer">
+                            {t.autoPlayLabel}
+                         </label>
                          <button
+                            id={autoPlayId}
                             onClick={() => setAutoPlay(!autoPlay)}
-                            className={`w-14 h-8 rounded-full border-2 border-black flex items-center px-1 transition-all ${
+                            className={`w-14 h-8 min-w-[56px] rounded-full border-2 border-black flex items-center px-1 transition-all ${
                                 autoPlay ? 'bg-green-400 justify-end' : 'bg-gray-200 justify-start'
                             }`}
+                            role="switch"
+                            aria-checked={autoPlay}
+                            aria-label={t.autoPlayLabel}
                         >
-                            <div className="w-5 h-5 bg-white border-2 border-black rounded-full shadow-sm"></div>
+                            <div className="w-5 h-5 bg-white border-2 border-black rounded-full shadow-sm" aria-hidden="true"></div>
                          </button>
                     </div>
 
                      {/* Audio Playback */}
                      {hasAudio && (
                         <div className="pt-4 border-t-2 border-dashed border-gray-200">
-                             <label className="font-bold text-gray-600 block mb-2">{t.lastTransmission}</label>
+                             <p className="font-bold text-gray-600 block mb-2">{t.lastTransmission}</p>
                              <button
                                 onClick={onPlayAudio}
                                 disabled={isPlaying}
-                                className="w-full p-4 border-2 border-black bg-yellow-300 font-black text-lg shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all flex items-center justify-center gap-2 active:shadow-none active:translate-x-[4px] active:translate-y-[4px] disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="w-full p-4 min-h-[56px] border-2 border-black bg-yellow-300 font-black text-lg shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all flex items-center justify-center gap-2 active:shadow-none active:translate-x-[4px] active:translate-y-[4px] disabled:opacity-50 disabled:cursor-not-allowed"
+                                aria-label={isPlaying ? t.playing : t.replayAudio}
+                                aria-disabled={isPlaying}
                             >
-                                <Volume2 size={24} className={isPlaying ? "animate-pulse" : ""} />
+                                <Volume2 size={24} className={isPlaying ? "animate-pulse" : ""} aria-hidden="true" />
                                 {isPlaying ? t.playing : t.replayAudio}
                             </button>
                         </div>
@@ -771,12 +935,19 @@ const SettingsModal = ({
 
             {/* Language Change Confirmation Dialog */}
             {showLanguageConfirm && (
-                <div className="absolute inset-0 bg-black/70 flex items-center justify-center p-4 z-10">
-                    <div className="bg-white wobbly-box p-6 max-w-xs w-full">
-                        <h3 className="text-xl font-black mb-3">
-                            {language === 'de' ? '⚠️ Sprache wechseln?' : '⚠️ Change Language?'}
+                <div
+                    className="absolute inset-0 bg-black/70 flex items-center justify-center p-4 z-10"
+                    role="alertdialog"
+                    aria-modal="true"
+                    aria-labelledby="confirm-dialog-title"
+                    aria-describedby="confirm-dialog-desc"
+                >
+                    <div ref={confirmModalRef} className="bg-white wobbly-box p-6 max-w-xs w-full">
+                        <h3 id="confirm-dialog-title" className="text-xl font-black mb-3">
+                            <span aria-hidden="true">⚠️ </span>
+                            {language === 'de' ? 'Sprache wechseln?' : 'Change Language?'}
                         </h3>
-                        <p className="text-gray-700 mb-4 leading-relaxed">
+                        <p id="confirm-dialog-desc" className="text-gray-700 mb-4 leading-relaxed">
                             {language === 'de'
                                 ? 'Das Ergebnis wird neu generiert, um die Antwort und das Audio in der neuen Sprache zu erhalten.'
                                 : 'This will regenerate the result to get the response and audio in the new language.'}
@@ -784,13 +955,13 @@ const SettingsModal = ({
                         <div className="flex gap-2">
                             <button
                                 onClick={cancelLanguageChange}
-                                className="flex-1 p-3 border-2 border-gray-300 text-gray-600 font-bold hover:bg-gray-100 transition-all"
+                                className="flex-1 p-3 min-h-[48px] border-2 border-gray-300 text-gray-700 font-bold hover:bg-gray-100 transition-all"
                             >
                                 {language === 'de' ? 'Abbrechen' : 'Cancel'}
                             </button>
                             <button
                                 onClick={confirmLanguageChange}
-                                className="flex-1 p-3 bg-black text-white font-bold border-2 border-black hover:bg-gray-800 transition-all"
+                                className="flex-1 p-3 min-h-[48px] bg-black text-white font-bold border-2 border-black hover:bg-gray-800 transition-all"
                             >
                                 {language === 'de' ? 'Neu generieren' : 'Regenerate'}
                             </button>
@@ -803,17 +974,17 @@ const SettingsModal = ({
 };
 
 // --- Onboarding Guide Component ---
-const OnboardingGuide = ({ 
-    step, 
-    onNext, 
-    onClose, 
+const OnboardingGuide = ({
+    step,
+    onNext,
+    onClose,
     refs,
     language
-}: { 
-    step: number, 
-    onNext: () => void, 
+}: {
+    step: number,
+    onNext: () => void,
     onClose: () => void,
-    refs: { 
+    refs: {
         settings: React.RefObject<HTMLButtonElement | null>,
         input: React.RefObject<HTMLTextAreaElement | null>,
         button: React.RefObject<HTMLButtonElement | null>
@@ -821,6 +992,11 @@ const OnboardingGuide = ({
     language: 'en' | 'de'
 }) => {
     const annotationRef = useRef<any>(null);
+    const guideRef = useRef<HTMLDivElement>(null);
+
+    // Focus trap and escape key for the guide
+    useFocusTrap(true, guideRef);
+    useEscapeKey(true, onClose);
 
     const stepsEn = [
         {
@@ -877,6 +1053,7 @@ const OnboardingGuide = ({
     ];
 
     const steps = language === 'de' ? stepsDe : stepsEn;
+    const totalSteps = steps.length;
 
     const currentStepData = steps[step] || steps[0];
 
@@ -936,50 +1113,83 @@ const OnboardingGuide = ({
         }
     };
 
+    const closeLabel = language === 'de' ? 'Tour schließen' : 'Close tour';
+    const stepLabel = language === 'de'
+        ? `Schritt ${step + 1} von ${totalSteps}`
+        : `Step ${step + 1} of ${totalSteps}`;
+
     return (
-        <div className="absolute inset-0 z-50 pointer-events-none flex flex-col items-center justify-center overflow-visible">
+        <div
+            className="absolute inset-0 z-50 pointer-events-none flex flex-col items-center justify-center overflow-visible"
+            role="dialog"
+            aria-modal="true"
+            aria-label={language === 'de' ? 'Anleitung Tour' : 'Onboarding Tour'}
+        >
              {/* Backdrop for step 0 to focus attention */}
-             {step === 0 && <div className="absolute inset-0 bg-white/50 backdrop-blur-sm -z-10 pointer-events-auto" onClick={onClose}></div>}
+             {step === 0 && (
+                <div
+                    className="absolute inset-0 bg-white/50 backdrop-blur-sm -z-10 pointer-events-auto"
+                    onClick={onClose}
+                    aria-hidden="true"
+                ></div>
+             )}
 
              {/* Positioning Wrapper: Handles Static Layout Position (Top/Bottom) and Flex Alignment */}
-             <div 
+             <div
                 key={`wrapper-${step}`}
                 className={`absolute left-0 w-full flex ${getPositionClass(currentStepData.position)} transition-all duration-300 pointer-events-none`}
              >
                 {/* Animation Wrapper: Handles the Float/Bobbing Animation */}
                 <div className="animate-float">
-                    
-                     {/* The Sticky Note Visual: Handles Entrance Animation (Slap) and Interactivity */}
-                     <div className="w-[85vw] max-w-[300px] md:max-w-xs bg-yellow-200 text-black p-5 md:p-6 shadow-xl border-2 border-yellow-400/50 animate-slap origin-center pointer-events-auto mx-4" style={{ borderRadius: '2px 255px 5px 25px / 255px 5px 225px 5px' }}>
-                        
-                        {/* Tape */}
-                        <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-24 h-6 bg-white/40 rotate-1"></div>
 
-                        <button 
-                            onClick={onClose} 
-                            className="absolute -top-2 -right-2 bg-white rounded-full p-1 border border-gray-200 hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
+                     {/* The Sticky Note Visual: Handles Entrance Animation (Slap) and Interactivity */}
+                     <div
+                        ref={guideRef}
+                        className="w-[85vw] max-w-[300px] md:max-w-xs bg-yellow-200 text-black p-5 md:p-6 shadow-xl border-2 border-yellow-400/50 animate-slap origin-center pointer-events-auto mx-4"
+                        style={{ borderRadius: '2px 255px 5px 25px / 255px 5px 225px 5px' }}
+                        role="region"
+                        aria-labelledby={`tour-step-title-${step}`}
+                     >
+
+                        {/* Tape */}
+                        <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-24 h-6 bg-white/40 rotate-1" aria-hidden="true"></div>
+
+                        <button
+                            onClick={onClose}
+                            className="absolute -top-2 -right-2 bg-white rounded-full p-2 min-w-[36px] min-h-[36px] border border-gray-200 hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors flex items-center justify-center"
+                            aria-label={closeLabel}
                         >
-                            <X size={16} />
+                            <X size={16} aria-hidden="true" />
                         </button>
 
-                        <h3 className="font-black text-lg mb-2 flex items-center gap-2">
-                            <span className="bg-black text-white rounded-full w-6 h-6 flex items-center justify-center text-xs shrink-0">{step + 1}</span>
+                        <h3 id={`tour-step-title-${step}`} className="font-black text-lg mb-2 flex items-center gap-2">
+                            <span
+                                className="bg-black text-white rounded-full w-6 h-6 flex items-center justify-center text-xs shrink-0"
+                                aria-hidden="true"
+                            >
+                                {step + 1}
+                            </span>
+                            <span className="sr-only">{stepLabel}: </span>
                             {currentStepData.title}
                         </h3>
-                        
+
                         <p className="font-hand text-sm md:text-base leading-tight mb-4 text-gray-800">
                             {currentStepData.text}
                         </p>
 
                         <div className="flex justify-end">
-                            <button 
+                            <button
                                 onClick={onNext}
-                                className="bg-black text-white px-3 py-1.5 md:px-4 md:py-2 font-bold transform rotate-1 hover:-rotate-1 transition-transform flex items-center gap-2 text-xs md:text-sm border-2 border-transparent hover:border-black hover:bg-white hover:text-black"
+                                className="bg-black text-white px-4 py-2 min-h-[44px] font-bold transform rotate-1 hover:-rotate-1 transition-transform flex items-center gap-2 text-sm border-2 border-transparent hover:border-black hover:bg-white hover:text-black"
+                                aria-label={step === totalSteps - 1
+                                    ? (language === 'de' ? 'Tour beenden' : 'Finish tour')
+                                    : (language === 'de' ? `Weiter zu Schritt ${step + 2}` : `Continue to step ${step + 2}`)
+                                }
                             >
-                                {step === steps.length - 1 
-                                    ? (language === 'de' ? "Verstanden" : "Got it") 
+                                {step === totalSteps - 1
+                                    ? (language === 'de' ? "Verstanden" : "Got it")
                                     : (language === 'de' ? "Weiter" : "Next")
-                                } <ArrowRight size={14} />
+                                } <ArrowRight size={14} aria-hidden="true" />
                             </button>
                         </div>
                      </div>
@@ -1094,10 +1304,13 @@ const [loadingMsg, setLoadingMsg] = useState(LOADING_MESSAGES_EN[0]);
     }
   }, [apiKey]);
 
-  // Save language preference when it changes
+  // Save language preference when it changes and update HTML lang attribute
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('user_language', language);
+      // Update HTML lang attribute for screen readers
+      const htmlElement = document.getElementById('html-root') || document.documentElement;
+      htmlElement.setAttribute('lang', language === 'de' ? 'de' : 'en');
     }
   }, [language]);
 
@@ -1533,88 +1746,133 @@ You do not roast the user. You are the user's weapon. The user will paste text f
     await handleSilencer(newLanguage);
   };
 
+  // Translation strings for accessibility
+  const a11y = {
+    skipToContent: language === 'de' ? 'Zum Hauptinhalt springen' : 'Skip to main content',
+    helpTour: language === 'de' ? 'Hilfe und Tour öffnen' : 'Open help and tour',
+    settingsOpen: language === 'de' ? 'Einstellungen öffnen' : 'Open settings',
+    appTitle: language === 'de' ? 'Smartass Silencer - Ein Werkzeug zur Analyse von Aussagen' : "Smartass Silencer - A tool for analyzing statements",
+    inputLabel: language === 'de' ? 'Gib die zu analysierende Aussage ein' : 'Enter the statement to analyze',
+  };
+
+  // Error ID for aria-describedby
+  const errorId = 'input-error-message';
+  const inputId = 'statement-input';
+
   return (
-    <div className="min-h-screen relative flex flex-col items-center justify-center p-2 md:p-4 overflow-hidden">
+    <>
+      {/* Skip to content link */}
+      <a href="#main-content" className="skip-link">
+        {a11y.skipToContent}
+      </a>
 
-      <LanguageSelectionModal
-        isOpen={showLanguageSelect}
-        onSelectLanguage={(lang) => {
-          setLanguage(lang);
-          setShowLanguageSelect(false);
-        }}
-      />
+      {/* Screen reader live region for status updates */}
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+      >
+        {step === 'loading' && loadingMsg}
+        {step === 'result' && (language === 'de' ? 'Analyse abgeschlossen' : 'Analysis complete')}
+      </div>
 
-      <SettingsModal
-        isOpen={showSettings}
-        onClose={() => setShowSettings(false)}
-        language={language}
-        setLanguage={setLanguage}
-        onPlayAudio={playAudio}
-        hasAudio={!!audioBufferRef.current}
-        autoPlay={autoPlay}
-        setAutoPlay={setAutoPlay}
-        isPlaying={isPlaying}
-        step={step}
-        onRegenerateWithLanguage={handleRegenerateWithLanguage}
-      />
+      <div className="min-h-screen relative flex flex-col items-center justify-center p-2 md:p-4 overflow-hidden">
 
-      {/* Main Container */}
-      <div className="w-full max-w-2xl relative z-10 my-2 md:my-6 px-2">
-        
-        {/* The Card */}
-        <div className="bg-white wobbly-box p-4 md:p-8 relative">
+        <LanguageSelectionModal
+          isOpen={showLanguageSelect}
+          onSelectLanguage={(lang) => {
+            setLanguage(lang);
+            setShowLanguageSelect(false);
+          }}
+        />
 
-            {/* Header Controls */}
-            <div className="absolute top-4 right-4 flex gap-2 z-30">
-                 {/* Help Button */}
-                <button
-                    onClick={() => setTourStep(0)}
-                    className="text-gray-400 hover:text-black hover:scale-110 transition-all duration-300"
-                    title={language === 'de' ? 'Hilfe & Tour' : 'Help & Tour'}
-                >
-                    <HelpCircle size={24} />
-                </button>
+        <SettingsModal
+          isOpen={showSettings}
+          onClose={() => setShowSettings(false)}
+          language={language}
+          setLanguage={setLanguage}
+          onPlayAudio={playAudio}
+          hasAudio={!!audioBufferRef.current}
+          autoPlay={autoPlay}
+          setAutoPlay={setAutoPlay}
+          isPlaying={isPlaying}
+          step={step}
+          onRegenerateWithLanguage={handleRegenerateWithLanguage}
+        />
 
-                {/* Settings Button */}
-                <button
-                    ref={settingsBtnRef}
-                    onClick={() => setShowSettings(true)}
-                    className="text-gray-400 hover:text-black hover:rotate-90 transition-all duration-300"
-                    title={language === 'de' ? 'Einstellungen' : 'Settings'}
-                >
-                    <Settings size={24} />
-                </button>
-            </div>
+        {/* Main Container */}
+        <main
+          id="main-content"
+          className="w-full max-w-2xl relative z-10 my-2 md:my-6 px-2"
+          role="main"
+          aria-label={a11y.appTitle}
+        >
 
-            {/* Tape Effect */}
-            <div className="absolute -top-4 left-1/2 -translate-x-1/2 w-32 h-10 bg-pink-200 opacity-80 -rotate-1 shadow-sm z-20" style={{clipPath: 'polygon(2% 0, 100% 0, 98% 100%, 0% 100%)'}}></div>
+          {/* The Card */}
+          <article className="bg-white wobbly-box p-4 md:p-8 relative">
 
-            {/* Title Section */}
-            <div className="mb-6 mt-2 text-center relative flex flex-col items-center">
-                <div className="relative w-full h-52 md:h-72 flex items-center justify-center px-2">
-                    <img
-                        src={logoImg}
-                        alt="Jazz's Smartass Silencer"
-                        className="w-full h-full object-contain transform -rotate-1 hover:rotate-0 transition-transform duration-300 drop-shadow-sm"
-                        onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                            const fallback = document.getElementById('title-fallback');
-                            if (fallback) fallback.style.display = 'block';
-                        }}
-                    />
-                    <div id="title-fallback" style={{display: 'none'}} className="w-full h-full">
-                        <ScribbleHeader
-                            text={language === 'de' ? "Der Rausschmeißer" : "Jazz's Smartass Silencer"}
-                            className="w-full h-full" 
-                        />
-                    </div>
-                </div>
-            </div>
+              {/* Header Controls */}
+              <header className="absolute top-4 right-4 flex gap-2 z-30">
+                   {/* Help Button */}
+                  <button
+                      onClick={() => setTourStep(0)}
+                      className="p-2 min-w-[44px] min-h-[44px] text-gray-500 hover:text-black hover:scale-110 transition-all duration-300 flex items-center justify-center rounded-full hover:bg-gray-100"
+                      aria-label={a11y.helpTour}
+                  >
+                      <HelpCircle size={24} aria-hidden="true" />
+                  </button>
+
+                  {/* Settings Button */}
+                  <button
+                      ref={settingsBtnRef}
+                      onClick={() => setShowSettings(true)}
+                      className="p-2 min-w-[44px] min-h-[44px] text-gray-500 hover:text-black hover:rotate-90 transition-all duration-300 flex items-center justify-center rounded-full hover:bg-gray-100"
+                      aria-label={a11y.settingsOpen}
+                  >
+                      <Settings size={24} aria-hidden="true" />
+                  </button>
+              </header>
+
+              {/* Tape Effect - decorative */}
+              <div
+                className="absolute -top-4 left-1/2 -translate-x-1/2 w-32 h-10 bg-pink-200 opacity-80 -rotate-1 shadow-sm z-20"
+                style={{clipPath: 'polygon(2% 0, 100% 0, 98% 100%, 0% 100%)'}}
+                aria-hidden="true"
+              ></div>
+
+              {/* Title Section */}
+              <div className="mb-6 mt-2 text-center relative flex flex-col items-center">
+                  <h1 className="sr-only">
+                    {language === 'de' ? "Jazz's Smartass Silencer" : "Jazz's Smartass Silencer"}
+                  </h1>
+                  <div className="relative w-full h-52 md:h-72 flex items-center justify-center px-2">
+                      <img
+                          src={logoImg}
+                          alt=""
+                          role="presentation"
+                          className="w-full h-full object-contain transform -rotate-1 hover:rotate-0 transition-transform duration-300 drop-shadow-sm"
+                          onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                              const fallback = document.getElementById('title-fallback');
+                              if (fallback) fallback.style.display = 'block';
+                          }}
+                      />
+                      <div id="title-fallback" style={{display: 'none'}} className="w-full h-full" aria-hidden="true">
+                          <ScribbleHeader
+                              text={language === 'de' ? "Der Rausschmeißer" : "Jazz's Smartass Silencer"}
+                              className="w-full h-full"
+                              as="span"
+                          />
+                      </div>
+                  </div>
+              </div>
 
             {step === 'input' && (
-                <div className="flex flex-col gap-4">
+                <section className="flex flex-col gap-4" aria-labelledby="input-section-heading">
                     <div className="relative">
-                        <div className="mb-4 mt-4 h-20 w-full overflow-visible">
+                        {/* Visual header with screen reader alternative */}
+                        <div className="mb-4 mt-4 h-20 w-full overflow-visible" aria-hidden="true">
                            <ScribbleHeader
                                 text={isRecording
                                     ? (language === 'de' ? "Höre zu..." : "Listening...")
@@ -1622,120 +1880,157 @@ You do not roast the user. You are the user's weapon. The user will paste text f
                                 }
                                 delay={0.2}
                                 color={isRecording ? "#ef4444" : "#2a2a2a"}
+                                as="span"
                             />
                         </div>
+                        <h2 id="input-section-heading" className="sr-only">
+                            {a11y.inputLabel}
+                        </h2>
 
                         <div className="relative">
+                            {/* Visually hidden label for screen readers */}
+                            <label htmlFor={inputId} className="sr-only">
+                                {a11y.inputLabel}
+                            </label>
                             <RoughHighlight show={inputFocused} type="bracket" color="#ef4444" padding={4} strokeWidth={2} iterations={2} animationDuration={400}>
-                                <textarea 
+                                <textarea
+                                    id={inputId}
                                     ref={inputRef}
                                     value={input}
                                     onChange={(e) => setInput(e.target.value)}
                                     onFocus={() => setInputFocused(true)}
                                     onBlur={() => setInputFocused(false)}
-                                    className={`w-full h-40 wobbly-input p-4 pb-12 text-lg md:text-xl bg-gray-50 focus:bg-white focus:ring-0 outline-none resize-none font-hand text-gray-800 leading-normal shadow-inner placeholder:text-gray-300 relative z-10 transition-all duration-300 ${inputFocused ? 'scale-[1.01] shadow-lg' : ''}`}
+                                    className={`w-full h-40 wobbly-input p-4 pb-12 text-lg md:text-xl bg-gray-50 focus:bg-white focus:ring-0 outline-none resize-none font-hand text-gray-800 leading-normal shadow-inner placeholder:text-gray-400 relative z-10 transition-all duration-300 ${inputFocused ? 'scale-[1.01] shadow-lg' : ''}`}
                                     placeholder={language === 'de' ? "z.B. 'Eigentlich ist HTML eine Programmiersprache'" : "e.g. 'Actually, HTML is a programming language'"}
+                                    aria-describedby={error ? errorId : undefined}
+                                    aria-invalid={error ? 'true' : 'false'}
                                 />
                             </RoughHighlight>
 
                             <button
                                 onClick={toggleRecording}
-                                className={`absolute bottom-3 right-3 p-2 rounded-full transition-all duration-300 z-20 ${
+                                className={`absolute bottom-3 right-3 p-3 min-w-[44px] min-h-[44px] rounded-full transition-all duration-300 z-20 flex items-center justify-center ${
                                     isRecording
-                                    ? "text-red-500 animate-pulse"
-                                    : "text-gray-400/50 hover:text-gray-600 hover:opacity-100"
+                                    ? "text-red-500 animate-pulse bg-red-50"
+                                    : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"
                                 }`}
-                                title={language === 'de' ? 'Spracheingabe umschalten' : 'Toggle voice input'}
+                                aria-label={isRecording
+                                    ? (language === 'de' ? 'Sprachaufnahme beenden' : 'Stop voice recording')
+                                    : (language === 'de' ? 'Sprachaufnahme starten' : 'Start voice recording')
+                                }
+                                aria-pressed={isRecording}
                             >
-                                {isRecording ? <MicOff size={24} /> : <Mic size={24} />}
+                                {isRecording ? <MicOff size={24} aria-hidden="true" /> : <Mic size={24} aria-hidden="true" />}
                             </button>
                         </div>
                     </div>
 
                     <RoughHighlight show={btnHovered} type="circle" color="#000" padding={10} iterations={1} strokeWidth={2}>
-                        <button 
-                        ref={actionBtnRef}
-                        onClick={() => { playClickSound(); handleSilencer(); }}
-                        onMouseEnter={() => setBtnHovered(true)}
-                        onMouseLeave={() => setBtnHovered(false)}
-                        disabled={!input.trim()}
-                        className="w-full wobbly-box bg-red-400 px-8 py-4 text-2xl md:text-3xl font-black flex items-center justify-center gap-3 hover:bg-red-500 text-white disabled:opacity-50 disabled:cursor-not-allowed transform hover:-translate-y-1 hover:scale-[1.02] active:scale-95 active:translate-y-1 transition-all duration-150 mt-2"
+                        <button
+                          ref={actionBtnRef}
+                          onClick={() => { playClickSound(); handleSilencer(); }}
+                          onMouseEnter={() => setBtnHovered(true)}
+                          onMouseLeave={() => setBtnHovered(false)}
+                          disabled={!input.trim()}
+                          className="w-full wobbly-box bg-red-500 px-8 py-4 min-h-[56px] text-2xl md:text-3xl font-black flex items-center justify-center gap-3 hover:bg-red-600 text-white disabled:opacity-50 disabled:cursor-not-allowed transform hover:-translate-y-1 hover:scale-[1.02] active:scale-95 active:translate-y-1 transition-all duration-150 mt-2"
+                          aria-disabled={!input.trim()}
                         >
-                        {language === 'de' ? "Bullshit Analysieren" : "Analyse Bullshit"}
+                          {language === 'de' ? "Bullshit Analysieren" : "Analyse Bullshit"}
                         </button>
                     </RoughHighlight>
 
                     {error && (
-                        <div className="wobbly-box bg-red-100 p-4 flex items-center gap-3 text-red-600 text-xl font-bold rotate-1 animate-bounce">
-                            <Coffee size={24} /> {error}
+                        <div
+                          id={errorId}
+                          role="alert"
+                          className="wobbly-box bg-red-100 p-4 flex items-center gap-3 text-red-700 text-xl font-bold rotate-1"
+                        >
+                            <Coffee size={24} aria-hidden="true" /> {error}
                         </div>
                     )}
-                </div>
+                </section>
             )}
 
             {step === 'loading' && (
-                <div className="h-80 flex flex-col items-center justify-center gap-6 animate-in fade-in duration-300">
+                <section
+                  className="h-80 flex flex-col items-center justify-center gap-6 animate-in fade-in duration-300"
+                  aria-label={language === 'de' ? 'Analyse läuft' : 'Analysis in progress'}
+                  aria-busy="true"
+                >
                     <PongLoader />
                     <div className="text-center w-full">
-                        <h2 className="text-3xl font-black animate-bounce min-h-[4rem] flex items-center justify-center px-4">
+                        <h2
+                          className="text-3xl font-black animate-bounce min-h-[4rem] flex items-center justify-center px-4"
+                          aria-live="polite"
+                        >
                             {loadingMsg}
                         </h2>
-                        <p className="text-gray-500 font-bold mt-2">
+                        <p className="text-gray-600 font-bold mt-2">
                              {language === 'de' ? "Tee trinken, Fehler verurteilen." : "Sipping tea, judging errors."}
                         </p>
                     </div>
-                </div>
+                </section>
             )}
 
             {step === 'result' && (
-                <div className="animate-crossfade">
+                <section className="animate-crossfade" aria-label={language === 'de' ? 'Analyseergebnis' : 'Analysis result'}>
                     <div className="flex justify-between items-center mb-6 border-b-2 border-dashed border-gray-300 pb-2">
-                        <div className="flex items-center gap-2 text-2xl font-black text-gray-400 uppercase">
-                            <Receipt size={24} /> 
-                            <span className="tracking-widest">{language === 'de' ? 'QUITTUNG' : 'RECEIPT'}</span>
+                        <div className="flex items-center gap-2 text-2xl font-black text-gray-500 uppercase">
+                            <Receipt size={24} aria-hidden="true" />
+                            <h2 className="tracking-widest">{language === 'de' ? 'QUITTUNG' : 'RECEIPT'}</h2>
                         </div>
-                        
+
                         <div className="flex items-center gap-4">
-                             {/* Re-added Audio Playback Control */}
+                             {/* Audio Playback Control */}
                              {audioBufferRef.current && (
                                 <button
-                                    onClick={playAudio}
-                                    disabled={isPlaying}
-                                    title={isPlaying ? (language === 'de' ? 'Spricht...' : 'Speaking...') : (language === 'de' ? 'Anhören' : 'Listen')}
-                                    className={`p-2 rounded-full border-2 transition-all ${
+                                    onClick={isPlaying ? stopAudio : playAudio}
+                                    className={`p-2 min-w-[44px] min-h-[44px] rounded-full border-2 transition-all flex items-center justify-center ${
                                         isPlaying
-                                            ? 'border-green-500 text-green-700 bg-green-50'
+                                            ? 'border-green-600 text-green-700 bg-green-50'
                                             : 'border-black text-black hover:bg-yellow-100'
                                     }`}
+                                    aria-label={isPlaying
+                                        ? (language === 'de' ? 'Audio stoppen' : 'Stop audio')
+                                        : (language === 'de' ? 'Audio abspielen' : 'Play audio')
+                                    }
+                                    aria-pressed={isPlaying}
                                 >
-                                    <Volume2 size={24} className={isPlaying ? "animate-pulse" : ""} />
+                                    {isPlaying
+                                      ? <Square size={20} aria-hidden="true" />
+                                      : <Volume2 size={24} aria-hidden="true" />
+                                    }
                                 </button>
                              )}
 
-                            <button onClick={reset} className="text-gray-400 hover:text-black font-bold underline decoration-wavy flex items-center gap-1 group">
-                                <PenTool size={16} className="group-hover:rotate-12 transition-transform"/> 
+                            <button
+                              onClick={reset}
+                              className="p-2 min-h-[44px] text-gray-500 hover:text-black font-bold underline decoration-wavy flex items-center gap-1 group"
+                              aria-label={language === 'de' ? 'Neues Ziel analysieren' : 'Analyze new target'}
+                            >
+                                <PenTool size={16} className="group-hover:rotate-12 transition-transform" aria-hidden="true" />
                                 {language === 'de' ? "Neues Opfer" : "New Target"}
                             </button>
                         </div>
                     </div>
 
                     {renderResult()}
-                </div>
+                </section>
             )}
             
             {/* Footer */}
-            <div className="mt-6 pt-4 border-t-2 border-dashed border-gray-200/50 flex flex-col items-center text-center">
-                <div className="font-bold text-base text-gray-600 rotate-1 mb-2">
+            <footer className="mt-6 pt-4 border-t-2 border-dashed border-gray-200/50 flex flex-col items-center text-center">
+                <p className="font-bold text-base text-gray-600 rotate-1 mb-2">
                     {language === 'de' ? 'Kaffee trinken, urteilen' : 'Drinking coffee, passing judgement'}
-                </div>
-                <div className="text-sm text-gray-400 font-bold -rotate-1">
+                </p>
+                <p className="text-sm text-gray-500 font-bold -rotate-1">
                     {language === 'de' ? 'Verantwortungsvoll nutzen' : 'Use responsibly'}
-                </div>
-            </div>
+                </p>
+            </footer>
 
             {/* Onboarding Overlay - Only show on input screen */}
             {tourStep !== null && step === 'input' && (
-                <OnboardingGuide 
+                <OnboardingGuide
                     step={tourStep}
                     onNext={() => {
                         if (tourStep < 3) {
@@ -1754,10 +2049,11 @@ You do not roast the user. You are the user's weapon. The user will paste text f
                 />
             )}
 
-        </div>
-      </div>
+          </article>
+        </main>
 
-    </div>
+      </div>
+    </>
   );
 };
 
