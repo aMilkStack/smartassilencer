@@ -1525,10 +1525,9 @@ const SettingsModal = ({
         >
             <div
                 ref={modalRef}
-                className={`bg-white md:wobbly-box w-full h-full md:h-auto md:max-h-[90vh] md:max-w-lg md:w-full relative flex flex-col overflow-hidden ${
+                className={`bg-white wobbly-box w-full h-full md:h-auto md:max-h-[90vh] md:max-w-lg md:w-full relative flex flex-col overflow-hidden ${
                     effectiveReducedMotion ? '' : 'animate-[modal-in_0.3s_ease-out]'
                 }`}
-                style={{ borderRadius: 'inherit' }}
             >
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 md:p-6 border-b-2 border-dashed border-gray-200 shrink-0">
