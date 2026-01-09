@@ -75,7 +75,6 @@
                 '0%': { opacity: '0', transform: 'translateY(10px) scale(0.98)' },
                 '100%': { opacity: '1', transform: 'translateY(0) scale(1)' },
               },
-<<<<<<< HEAD
               'rage-fill': {
                 '0%': { width: '0%' },
                 '60%': { width: '60%' },
@@ -100,7 +99,7 @@
               'flash': {
                 '0%': { opacity: '0.8', transform: 'scale(1)' },
                 '100%': { opacity: '0', transform: 'scale(2)' },
-=======
+              },
               'modal-in': {
                 '0%': { opacity: '0', transform: 'scale(0.95) translateY(10px)' },
                 '100%': { opacity: '1', transform: 'scale(1) translateY(0)' },
@@ -116,7 +115,6 @@
               'chevron-rotate': {
                 '0%': { transform: 'rotate(0deg)' },
                 '100%': { transform: 'rotate(180deg)' },
->>>>>>> 1919845 (feat: Add comprehensive settings modal with collapsible sections)
               }
             }
           }
@@ -125,6 +123,7 @@
     </script>
     <style>
       body {
+        zoom: 0.5;
         font-family: 'Gochi Hand', cursive;
         background-color: #fffdf5;
         color: #2a2a2a;
@@ -237,8 +236,7 @@
         animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
       }
 
-<<<<<<< HEAD
-      /* Rage Meter Particle Explosion */
+/* Rage Meter Particle Explosion */
       @keyframes particle-fly {
         0% {
           transform: translate(0, 0) scale(1) rotate(0deg);
@@ -262,7 +260,9 @@
 
       .rage-glow {
         animation: rage-glow 0.3s ease-in-out infinite;
-=======
+      }
+
+
       /* High Contrast Mode */
       .high-contrast {
         --bg-color: #000;
@@ -271,6 +271,7 @@
       }
 
       .high-contrast body {
+        zoom: 0.5;
         background-color: #000 !important;
         color: #fff !important;
       }
@@ -329,8 +330,7 @@
 
       .high-contrast input[type="range"]::-webkit-slider-thumb {
         background: #fff !important;
->>>>>>> 1919845 (feat: Add comprehensive settings modal with collapsible sections)
-      }
+}
 
     </style>
 </head>
