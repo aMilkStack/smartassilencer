@@ -994,7 +994,7 @@ const HandwritingTextarea = ({
             {/* The visual overlay - shows handwriting animation */}
             <div
                 ref={overlayRef}
-                className={`handwriting-overlay absolute inset-0 pointer-events-none overflow-hidden ${className}`}
+                className="handwriting-overlay absolute inset-0 pointer-events-none overflow-hidden p-4 pb-12 text-lg md:text-xl font-hand text-gray-800 leading-normal"
                 style={{
                     // Match textarea styling exactly
                     whiteSpace: 'pre-wrap',
