@@ -21,6 +21,16 @@
               'pop': 'pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.5) forwards',
               'bounce-once': 'bounce-once 0.4s ease-out forwards',
               'crossfade': 'crossfade 0.5s ease-out forwards',
+              'bounce-in': 'bounce-in 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards',
+              'bounce-in-delayed': 'bounce-in 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55) 0.1s forwards',
+              'fade-slide-in': 'fade-slide-in 0.4s ease-out forwards',
+              'fade-slide-out': 'fade-slide-out 0.3s ease-in forwards',
+              'skeleton-shimmer': 'skeleton-shimmer 1.5s ease-in-out infinite',
+              'pull-rotate': 'pull-rotate 0.6s ease-out',
+              'stagger-1': 'bounce-in 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55) 0.05s forwards',
+              'stagger-2': 'bounce-in 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55) 0.1s forwards',
+              'stagger-3': 'bounce-in 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55) 0.15s forwards',
+              'press': 'press 0.15s ease-out forwards',
             },
             keyframes: {
               slap: {
@@ -44,6 +54,33 @@
               crossfade: {
                 '0%': { opacity: '0', transform: 'translateY(10px) scale(0.98)' },
                 '100%': { opacity: '1', transform: 'translateY(0) scale(1)' },
+              },
+              'bounce-in': {
+                '0%': { opacity: '0', transform: 'scale(0.3) translateY(20px)' },
+                '50%': { opacity: '1', transform: 'scale(1.05) translateY(-5px)' },
+                '70%': { transform: 'scale(0.95) translateY(2px)' },
+                '100%': { opacity: '1', transform: 'scale(1) translateY(0)' },
+              },
+              'fade-slide-in': {
+                '0%': { opacity: '0', transform: 'translateY(15px)' },
+                '100%': { opacity: '1', transform: 'translateY(0)' },
+              },
+              'fade-slide-out': {
+                '0%': { opacity: '1', transform: 'translateY(0)' },
+                '100%': { opacity: '0', transform: 'translateY(-15px)' },
+              },
+              'skeleton-shimmer': {
+                '0%': { backgroundPosition: '-200% 0' },
+                '100%': { backgroundPosition: '200% 0' },
+              },
+              'pull-rotate': {
+                '0%': { transform: 'rotate(0deg)' },
+                '100%': { transform: 'rotate(360deg)' },
+              },
+              'press': {
+                '0%': { transform: 'scale(1)' },
+                '50%': { transform: 'scale(0.95)' },
+                '100%': { transform: 'scale(1)' },
               }
             }
           }
@@ -153,6 +190,58 @@
       
       .animate-shake {
         animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
+      }
+
+      /* Button Press State - Enhanced tactile feedback */
+      .btn-press {
+        transition: transform 0.1s ease-out, box-shadow 0.1s ease-out;
+      }
+
+      .btn-press:active {
+        transform: scale(0.96) translateY(2px);
+      }
+
+      /* Skeleton Loading Shimmer */
+      .skeleton {
+        background: linear-gradient(
+          90deg,
+          #e5e5e5 25%,
+          #f0f0f0 50%,
+          #e5e5e5 75%
+        );
+        background-size: 200% 100%;
+        animation: skeleton-shimmer 1.5s ease-in-out infinite;
+        border-radius: 8px;
+      }
+
+      /* Pull to Refresh Indicator */
+      .pull-indicator {
+        transition: transform 0.2s ease-out, opacity 0.2s ease-out;
+      }
+
+      /* Smooth state transitions */
+      .state-transition {
+        transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+      }
+
+      .state-enter {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+
+      .state-enter-active {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      .state-exit {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      .state-exit-active {
+        opacity: 0;
+        transform: translateY(-10px);
       }
 
     </style>
