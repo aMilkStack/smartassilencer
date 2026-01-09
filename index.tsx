@@ -20,6 +20,29 @@ import {
   Square
 } from "lucide-react";
 
+// --- Keyboard Navigation Hooks ---
+
+/**
+ * Hook for trapping focus within a container (for modals/dialogs)
+ * Returns a ref to attach to the container element
+ */
+const useFocusTrap = (isActive: boolean, onEscape?: () => void) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const previousActiveElement = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!isActive) return;
+
+    // Store the currently focused element to restore later
+    previousActiveElement.current = document.activeElement as HTMLElement;
+
+    const container = containerRef.current;
+    if (!container) return;
+
+    // Get all focusable elements
+    const getFocusableElements = () => {
+      return container.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"]):not([disabled])'
 // --- Focus Trap Hook for Modals ---
 const useFocusTrap = (isActive: boolean, containerRef: React.RefObject<HTMLElement | null>) => {
   const previousActiveElement = useRef<HTMLElement | null>(null);
@@ -44,6 +67,29 @@ const useFocusTrap = (isActive: boolean, containerRef: React.RefObject<HTMLEleme
     // Focus the first focusable element
     const focusableElements = getFocusableElements();
     if (focusableElements.length > 0) {
+      setTimeout(() => focusableElements[0].focus(), 50);
+    }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Handle Escape key
+      if (e.key === 'Escape' && onEscape) {
+        e.preventDefault();
+        onEscape();
+        return;
+      }
+
+      // Handle Tab key for focus trapping
+      if (e.key === 'Tab') {
+        const focusable = getFocusableElements();
+        if (focusable.length === 0) return;
+
+        const firstElement = focusable[0];
+        const lastElement = focusable[focusable.length - 1];
+
+        if (e.shiftKey && document.activeElement === firstElement) {
+          e.preventDefault();
+          lastElement.focus();
+        } else if (!e.shiftKey && document.activeElement === lastElement) {
       focusableElements[0].focus();
     }
 
@@ -73,6 +119,86 @@ const useFocusTrap = (isActive: boolean, containerRef: React.RefObject<HTMLEleme
 
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
+      // Restore focus to previously focused element
+      if (previousActiveElement.current && previousActiveElement.current.focus) {
+        previousActiveElement.current.focus();
+      }
+    };
+  }, [isActive, onEscape]);
+
+  return containerRef;
+};
+
+/**
+ * Hook for roving tabindex in grouped controls (like button groups)
+ * Handles arrow key navigation within a group of elements
+ */
+const useRovingTabIndex = <T extends HTMLElement>(
+  items: number,
+  orientation: 'horizontal' | 'vertical' | 'both' = 'horizontal'
+) => {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const itemRefs = useRef<(T | null)[]>([]);
+
+  const setItemRef = (index: number) => (el: T | null) => {
+    itemRefs.current[index] = el;
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent, index: number) => {
+    const isHorizontal = orientation === 'horizontal' || orientation === 'both';
+    const isVertical = orientation === 'vertical' || orientation === 'both';
+
+    let newIndex = index;
+
+    switch (e.key) {
+      case 'ArrowLeft':
+        if (isHorizontal) {
+          e.preventDefault();
+          newIndex = index > 0 ? index - 1 : items - 1;
+        }
+        break;
+      case 'ArrowRight':
+        if (isHorizontal) {
+          e.preventDefault();
+          newIndex = index < items - 1 ? index + 1 : 0;
+        }
+        break;
+      case 'ArrowUp':
+        if (isVertical) {
+          e.preventDefault();
+          newIndex = index > 0 ? index - 1 : items - 1;
+        }
+        break;
+      case 'ArrowDown':
+        if (isVertical) {
+          e.preventDefault();
+          newIndex = index < items - 1 ? index + 1 : 0;
+        }
+        break;
+      case 'Home':
+        e.preventDefault();
+        newIndex = 0;
+        break;
+      case 'End':
+        e.preventDefault();
+        newIndex = items - 1;
+        break;
+    }
+
+    if (newIndex !== index) {
+      setActiveIndex(newIndex);
+      itemRefs.current[newIndex]?.focus();
+    }
+  };
+
+  const getItemProps = (index: number) => ({
+    ref: setItemRef(index),
+    tabIndex: index === activeIndex ? 0 : -1,
+    onKeyDown: (e: React.KeyboardEvent) => handleKeyDown(e, index),
+    onFocus: () => setActiveIndex(index),
+  });
+
+  return { activeIndex, setActiveIndex, getItemProps };
       // Return focus to previous element
       if (previousActiveElement.current) {
         previousActiveElement.current.focus();
@@ -519,159 +645,6 @@ const PongLoader = () => {
         ctx.stroke();
     };
 
-    const loop = () => {
-        // AI Logic: Move towards ball Y with slight delay for fairness
-        const target = ball.y;
-        const aiSpeed = 0.06;
-        aiY += (target - aiY) * aiSpeed;
-
-        // Clamp AI
-        aiY = Math.max(paddleHeight/2, Math.min(h - paddleHeight/2, aiY));
-
-        // Physics (only if ball is not paused)
-        if (!ballPaused && !gameOver) {
-            ball.x += ball.dx;
-            ball.y += ball.dy;
-        }
-
-        // Wall Bounces (Top & Bottom) with position correction
-        if (ball.y - ballR < 0) {
-            ball.y = ballR;
-            ball.dy = Math.abs(ball.dy);
-        }
-        if (ball.y + ballR > h) {
-            ball.y = h - ballR;
-            ball.dy = -Math.abs(ball.dy);
-        }
-
-        // Player Paddle (Left Side) Collision
-        const playerPaddleRight = paddleOffset + paddleWidth;
-        if (ball.dx < 0 && ball.x - ballR <= playerPaddleRight && ball.x + ballR >= paddleOffset) {
-            if (ball.y >= playerY - paddleHeight/2 - ballR && ball.y <= playerY + paddleHeight/2 + ballR) {
-                ball.x = playerPaddleRight + ballR; // Push ball out
-                ball.dx = Math.abs(ball.dx) * 1.03; // Bounce right, slight speedup
-                const hitOffset = (ball.y - playerY) / (paddleHeight/2);
-                ball.dy += hitOffset * 1.5; // Add spin
-            }
-        }
-
-        // AI Paddle (Right Side) Collision
-        const aiPaddleLeft = w - paddleOffset - paddleWidth;
-        if (ball.dx > 0 && ball.x + ballR >= aiPaddleLeft && ball.x - ballR <= w - paddleOffset) {
-            if (ball.y >= aiY - paddleHeight/2 - ballR && ball.y <= aiY + paddleHeight/2 + ballR) {
-                ball.x = aiPaddleLeft - ballR; // Push ball out
-                ball.dx = -Math.abs(ball.dx) * 1.03; // Bounce left, slight speedup
-                const hitOffset = (ball.y - aiY) / (paddleHeight/2);
-                ball.dy += hitOffset * 1.5; // Add spin
-            }
-        }
-
-        // Scoring if missed (Left or Right walls)
-        if (ball.x < -ballR * 2) {
-            // AI scored (ball went past player)
-            aiScore++;
-            if (aiScore >= winningScore) {
-                gameOver = true;
-            } else {
-                ball = resetBall();
-                ballPaused = true;
-                pauseTimeout = window.setTimeout(() => {
-                    ballPaused = false;
-                }, 1000);
-            }
-        } else if (ball.x > w + ballR * 2) {
-            // Player scored (ball went past AI)
-            playerScore++;
-            if (playerScore >= winningScore) {
-                gameOver = true;
-            } else {
-                ball = resetBall();
-                ballPaused = true;
-                pauseTimeout = window.setTimeout(() => {
-                    ballPaused = false;
-                }, 1000);
-            }
-        }
-
-        // Cap speed
-        const maxSpeedX = 10;
-        const maxSpeedY = 8;
-        ball.dx = Math.max(-maxSpeedX, Math.min(maxSpeedX, ball.dx));
-        ball.dy = Math.max(-maxSpeedY, Math.min(maxSpeedY, ball.dy));
-
-        // Draw
-        ctx.clearRect(0, 0, w, h);
-
-        ctx.fillStyle = "#2a2a2a";
-        ctx.strokeStyle = "#2a2a2a";
-        ctx.lineWidth = 2;
-
-        // Player Paddle (Left)
-        drawRoundedRect(paddleOffset, playerY - paddleHeight/2, paddleWidth, paddleHeight, 4);
-
-        // AI Paddle (Right)
-        drawRoundedRect(w - paddleOffset - paddleWidth, aiY - paddleHeight/2, paddleWidth, paddleHeight, 4);
-
-        // Net (Vertical Dashed Line)
-        ctx.beginPath();
-        ctx.setLineDash([5, 15]);
-        ctx.moveTo(w/2, 0);
-        ctx.lineTo(w/2, h);
-        ctx.stroke();
-        ctx.setLineDash([]);
-
-        // Ball trail
-        ctx.fillStyle = "rgba(239, 68, 68, 0.15)";
-        ctx.beginPath();
-        ctx.arc(ball.x - ball.dx * 2, ball.y - ball.dy * 2, ballR * 0.8, 0, Math.PI*2);
-        ctx.fill();
-        ctx.fillStyle = "rgba(239, 68, 68, 0.08)";
-        ctx.beginPath();
-        ctx.arc(ball.x - ball.dx * 4, ball.y - ball.dy * 4, ballR * 0.6, 0, Math.PI*2);
-        ctx.fill();
-
-        // Ball
-        ctx.fillStyle = "#ef4444";
-        ctx.strokeStyle = "#2a2a2a";
-        ctx.beginPath();
-        ctx.arc(ball.x, ball.y, ballR, 0, Math.PI*2);
-        ctx.fill();
-        ctx.stroke();
-
-        // Draw Scores
-        ctx.fillStyle = "#2a2a2a";
-        ctx.font = "bold 32px 'Gochi Hand', cursive";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "top";
-
-        // Player score (left side)
-        ctx.fillText(playerScore.toString(), w / 4, 20);
-
-        // AI score (right side)
-        ctx.fillText(aiScore.toString(), (w * 3) / 4, 20);
-
-        // Game Over message
-        if (gameOver) {
-            ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
-            ctx.fillRect(0, 0, w, h);
-
-            ctx.fillStyle = "#fff";
-            ctx.font = "bold 48px 'Gochi Hand', cursive";
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
-
-            const winner = playerScore >= winningScore ? "YOU WIN!" : "CPU WINS!";
-            ctx.fillText(winner, w / 2, h / 2 - 20);
-
-            ctx.font = "bold 20px 'Gochi Hand', cursive";
-            ctx.fillText("Tap to restart", w / 2, h / 2 + 30);
-        }
-
-        animationId = requestAnimationFrame(loop);
-    };
-
-    loop();
-
     // Interaction Handlers
     const movePaddle = (clientY: number) => {
         if (gameOver) return; // Don't move paddle when game is over
@@ -711,9 +684,182 @@ const PongLoader = () => {
         }
     };
 
+    // Keyboard controls state
+    const keysPressed = new Set<string>();
+    const paddleSpeed = 8;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+        keysPressed.add(e.key);
+
+        // Restart game with Enter or Space when game over
+        if (gameOver && (e.key === 'Enter' || e.key === ' ')) {
+            e.preventDefault();
+            playerScore = 0;
+            aiScore = 0;
+            gameOver = false;
+            ball = resetBall();
+            playerY = h/2;
+            aiY = h/2;
+            ballPaused = false;
+        }
+
+        // Prevent page scrolling with arrow keys when focused
+        if (['ArrowUp', 'ArrowDown', ' '].includes(e.key)) {
+            e.preventDefault();
+        }
+    };
+
+    const onKeyUp = (e: KeyboardEvent) => {
+        keysPressed.delete(e.key);
+    };
+
+    // Process keyboard input in game loop
+    const processKeyboardInput = () => {
+        if (gameOver) return;
+
+        if (keysPressed.has('ArrowUp') || keysPressed.has('w') || keysPressed.has('W')) {
+            playerY = Math.max(paddleHeight/2, playerY - paddleSpeed);
+        }
+        if (keysPressed.has('ArrowDown') || keysPressed.has('s') || keysPressed.has('S')) {
+            playerY = Math.min(h - paddleHeight/2, playerY + paddleSpeed);
+        }
+    };
+
+    // Main game loop with keyboard input
+    const runLoop = () => {
+        processKeyboardInput();
+        // AI Logic: Move towards ball Y with slight delay for fairness
+        const target = ball.y;
+        const aiSpeed = 0.06;
+        aiY += (target - aiY) * aiSpeed;
+
+        // Clamp AI
+        aiY = Math.max(paddleHeight/2, Math.min(h - paddleHeight/2, aiY));
+
+        // Physics (only if ball is not paused)
+        if (!ballPaused && !gameOver) {
+            ball.x += ball.dx;
+            ball.y += ball.dy;
+        }
+
+        // Wall Bounces (Top & Bottom) with position correction
+        if (ball.y - ballR < 0) {
+            ball.y = ballR;
+            ball.dy = Math.abs(ball.dy);
+        }
+        if (ball.y + ballR > h) {
+            ball.y = h - ballR;
+            ball.dy = -Math.abs(ball.dy);
+        }
+
+        // Player Paddle (Left Side) Collision
+        const playerPaddleRight = paddleOffset + paddleWidth;
+        if (ball.dx < 0 && ball.x - ballR <= playerPaddleRight && ball.x + ballR >= paddleOffset) {
+            if (ball.y >= playerY - paddleHeight/2 - ballR && ball.y <= playerY + paddleHeight/2 + ballR) {
+                ball.x = playerPaddleRight + ballR;
+                ball.dx = Math.abs(ball.dx) * 1.03;
+                const hitOffset = (ball.y - playerY) / (paddleHeight/2);
+                ball.dy += hitOffset * 1.5;
+            }
+        }
+
+        // AI Paddle (Right Side) Collision
+        const aiPaddleLeft = w - paddleOffset - paddleWidth;
+        if (ball.dx > 0 && ball.x + ballR >= aiPaddleLeft && ball.x - ballR <= w - paddleOffset) {
+            if (ball.y >= aiY - paddleHeight/2 - ballR && ball.y <= aiY + paddleHeight/2 + ballR) {
+                ball.x = aiPaddleLeft - ballR;
+                ball.dx = -Math.abs(ball.dx) * 1.03;
+                const hitOffset = (ball.y - aiY) / (paddleHeight/2);
+                ball.dy += hitOffset * 1.5;
+            }
+        }
+
+        // Scoring if missed
+        if (ball.x < -ballR * 2) {
+            aiScore++;
+            if (aiScore >= winningScore) {
+                gameOver = true;
+            } else {
+                ball = resetBall();
+                ballPaused = true;
+                pauseTimeout = window.setTimeout(() => { ballPaused = false; }, 1000);
+            }
+        } else if (ball.x > w + ballR * 2) {
+            playerScore++;
+            if (playerScore >= winningScore) {
+                gameOver = true;
+            } else {
+                ball = resetBall();
+                ballPaused = true;
+                pauseTimeout = window.setTimeout(() => { ballPaused = false; }, 1000);
+            }
+        }
+
+        // Cap speed
+        ball.dx = Math.max(-10, Math.min(10, ball.dx));
+        ball.dy = Math.max(-8, Math.min(8, ball.dy));
+
+        // Draw
+        ctx.clearRect(0, 0, w, h);
+        ctx.fillStyle = "#2a2a2a";
+        ctx.strokeStyle = "#2a2a2a";
+        ctx.lineWidth = 2;
+
+        drawRoundedRect(paddleOffset, playerY - paddleHeight/2, paddleWidth, paddleHeight, 4);
+        drawRoundedRect(w - paddleOffset - paddleWidth, aiY - paddleHeight/2, paddleWidth, paddleHeight, 4);
+
+        ctx.beginPath();
+        ctx.setLineDash([5, 15]);
+        ctx.moveTo(w/2, 0);
+        ctx.lineTo(w/2, h);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        ctx.fillStyle = "rgba(239, 68, 68, 0.15)";
+        ctx.beginPath();
+        ctx.arc(ball.x - ball.dx * 2, ball.y - ball.dy * 2, ballR * 0.8, 0, Math.PI*2);
+        ctx.fill();
+        ctx.fillStyle = "rgba(239, 68, 68, 0.08)";
+        ctx.beginPath();
+        ctx.arc(ball.x - ball.dx * 4, ball.y - ball.dy * 4, ballR * 0.6, 0, Math.PI*2);
+        ctx.fill();
+
+        ctx.fillStyle = "#ef4444";
+        ctx.strokeStyle = "#2a2a2a";
+        ctx.beginPath();
+        ctx.arc(ball.x, ball.y, ballR, 0, Math.PI*2);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = "#2a2a2a";
+        ctx.font = "bold 32px 'Gochi Hand', cursive";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "top";
+        ctx.fillText(playerScore.toString(), w / 4, 20);
+        ctx.fillText(aiScore.toString(), (w * 3) / 4, 20);
+
+        if (gameOver) {
+            ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+            ctx.fillRect(0, 0, w, h);
+            ctx.fillStyle = "#fff";
+            ctx.font = "bold 48px 'Gochi Hand', cursive";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            const winner = playerScore >= winningScore ? "YOU WIN!" : "CPU WINS!";
+            ctx.fillText(winner, w / 2, h / 2 - 20);
+            ctx.font = "bold 20px 'Gochi Hand', cursive";
+            ctx.fillText("Press Enter to restart", w / 2, h / 2 + 30);
+        }
+
+        animationId = requestAnimationFrame(runLoop);
+    };
+    runLoop();
+
     container.addEventListener('touchmove', onTouch, { passive: false });
     container.addEventListener('mousemove', onMouse);
     container.addEventListener('click', onClick);
+    container.addEventListener('keydown', onKeyDown);
+    container.addEventListener('keyup', onKeyUp);
 
     // Handle Resize
     const handleResize = () => {
@@ -735,12 +881,31 @@ const PongLoader = () => {
         container.removeEventListener('touchmove', onTouch);
         container.removeEventListener('mousemove', onMouse);
         container.removeEventListener('click', onClick);
+        container.removeEventListener('keydown', onKeyDown);
+        container.removeEventListener('keyup', onKeyUp);
         window.removeEventListener('resize', handleResize);
     };
   }, []);
 
   return (
     <div
+        ref={containerRef}
+        tabIndex={0}
+        role="application"
+        aria-label="Pong game - Use arrow keys or W/S to move paddle, Enter to restart"
+        className="w-full h-48 md:h-60 wobbly-box bg-white relative overflow-hidden cursor-none touch-none select-none focus:outline-none focus:ring-2 focus:ring-amber-400"
+    >
+        <canvas ref={canvasRef} className="block w-full h-full" aria-hidden="true" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-gray-200 font-black text-4xl md:text-5xl pointer-events-none -z-10 select-none opacity-40 rotate-12 text-center" aria-hidden="true">
+            ↑↓ OR W/S<br />TO PLAY
+        </div>
+        <div className="absolute bottom-2 left-2 text-xs text-gray-400 font-bold opacity-50 pointer-events-none" aria-hidden="true">
+            YOU
+        </div>
+        <div className="absolute top-2 right-2 text-xs text-gray-400 font-bold opacity-50 pointer-events-none" aria-hidden="true">
+            CPU
+        </div>
+        <span className="sr-only">Interactive Pong game. Use up/down arrow keys or W/S to control paddle. Press Enter or Space to restart when game ends.</span>
       ref={containerRef}
       className="w-full h-48 md:h-60 wobbly-box bg-white relative overflow-hidden cursor-none touch-none select-none"
       role="application"
@@ -1271,8 +1436,7 @@ const CopyButton = ({ text, language }: { text: string, language: 'en' | 'de' })
     const copyLabel = language === 'de' ? 'In Zwischenablage kopieren' : 'Copy to clipboard';
     const copiedLabel = language === 'de' ? 'Kopiert!' : 'Copied!';
 
-    const handleCopy = async (e: React.MouseEvent) => {
-        e.stopPropagation();
+    const handleCopy = async () => {
         try {
             await navigator.clipboard.writeText(text);
             playPopSound();
@@ -1285,8 +1449,24 @@ const CopyButton = ({ text, language }: { text: string, language: 'en' | 'de' })
         }
     };
 
+    const handleClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        handleCopy();
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            e.stopPropagation();
+            handleCopy();
+        }
+    };
+
     return (
         <button
+            onClick={handleClick}
+            onKeyDown={handleKeyDown}
+            className={`absolute top-2 right-2 p-3 md:p-2 rounded-full hover:bg-black/5 transition-all duration-200 group z-20 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 ${copied ? 'animate-pop bg-green-50/50' : 'hover:scale-110 active:scale-90'}`}
             onClick={handleCopy}
             className={`absolute top-2 right-2 p-3 min-w-[44px] min-h-[44px] rounded-full hover:bg-black/5 transition-all duration-200 group z-20 flex items-center justify-center ${copied ? 'animate-pop bg-green-50/50' : 'hover:scale-110 active:scale-90'}`}
             aria-label={copied ? copiedLabel : copyLabel}
@@ -1294,13 +1474,18 @@ const CopyButton = ({ text, language }: { text: string, language: 'en' | 'de' })
             className={`absolute top-2 right-2 p-3 md:p-2 rounded-full hover:bg-black/5 transition-all duration-200 group z-20 focus-ring ${copied ? 'animate-pop bg-green-50/50' : 'hover:scale-110 active:scale-90'}`}
             className={`absolute top-2 right-2 p-3 md:p-2 rounded-full hover:bg-black/5 transition-all duration-200 group z-20 touch-feedback ${copied ? 'animate-pop bg-green-50/50' : 'hover:scale-110 active:scale-90'}`}
             title={language === 'de' ? 'In Zwischenablage kopieren' : 'Copy to clipboard'}
+            aria-label={copied
+                ? (language === 'de' ? 'Kopiert!' : 'Copied!')
+                : (language === 'de' ? 'In Zwischenablage kopieren' : 'Copy to clipboard')
+            }
+            aria-live="polite"
         >
             <div className="relative w-5 h-5" aria-hidden="true">
                 {/* Copy Icon - scales down and rotates out when copied */}
                 <div className={`absolute inset-0 transition-all duration-300 ease-out transform ${
                     copied ? 'opacity-0 scale-50 rotate-12' : 'opacity-100 scale-100 rotate-0'
                 }`}>
-                     <Copy size={20} className="text-gray-400 group-hover:text-black transition-colors" />
+                     <Copy size={20} className="text-gray-400 group-hover:text-black group-focus:text-black transition-colors" />
                 </div>
 
                 {/* Check Icon - pops in when copied */}
@@ -1481,6 +1666,11 @@ const LanguageSelectionModal = ({
     isOpen: boolean;
     onSelectLanguage: (lang: 'en' | 'de') => void;
 }) => {
+    // Focus trap for the modal (no escape since language must be selected)
+    const focusTrapRef = useFocusTrap(isOpen);
+
+    // Roving tabindex for language buttons (vertical navigation)
+    const { getItemProps } = useRovingTabIndex<HTMLButtonElement>(2, 'vertical');
     const modalRef = useRef<HTMLDivElement>(null);
 
     // Focus trap and escape key handling
@@ -1503,6 +1693,12 @@ const LanguageSelectionModal = ({
             aria-labelledby="language-modal-title"
         >
             <div
+                ref={focusTrapRef}
+                className="bg-white wobbly-box p-8 md:p-10 max-w-md w-full relative text-center space-y-6"
+            >
+                <div className="space-y-2">
+                    <h2 id="language-modal-title" className="text-2xl md:text-3xl font-black">Choose Your Language</h2>
+                    <p className="text-lg md:text-xl font-black">Wähle deine Sprache</p>
                 ref={modalRef}
                 className="bg-white wobbly-box p-8 md:p-10 max-w-md w-full relative text-center space-y-6"
             >
@@ -1519,7 +1715,9 @@ const LanguageSelectionModal = ({
 
                 <div className="space-y-3" role="group" aria-label="Language selection">
                     <button
+                        {...getItemProps(0)}
                         onClick={() => handleSelect('en')}
+                        className="w-full p-4 font-black text-xl bg-white border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[3px] hover:translate-y-[3px] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all active:shadow-none active:translate-x-[6px] active:translate-y-[6px] hover:bg-yellow-100 focus:outline-none focus:ring-4 focus:ring-amber-400 focus:ring-offset-2"
                         className="w-full p-4 min-h-[56px] font-black text-xl bg-white border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[3px] hover:translate-y-[3px] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all active:shadow-none active:translate-x-[6px] active:translate-y-[6px] hover:bg-yellow-100"
                         aria-label="Select English language"
                         className="w-full p-4 font-black text-xl bg-white border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[3px] hover:translate-y-[3px] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all active:shadow-none active:translate-x-[6px] active:translate-y-[6px] hover:bg-yellow-100 focus-ring"
@@ -1529,7 +1727,9 @@ const LanguageSelectionModal = ({
                         English
                     </button>
                     <button
+                        {...getItemProps(1)}
                         onClick={() => handleSelect('de')}
+                        className="w-full p-4 font-black text-xl bg-white border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[3px] hover:translate-y-[3px] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all active:shadow-none active:translate-x-[6px] active:translate-y-[6px] hover:bg-yellow-100 focus:outline-none focus:ring-4 focus:ring-amber-400 focus:ring-offset-2"
                         className="w-full p-4 min-h-[56px] font-black text-xl bg-white border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[3px] hover:translate-y-[3px] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all active:shadow-none active:translate-x-[6px] active:translate-y-[6px] hover:bg-yellow-100"
                         aria-label="Sprache Deutsch auswählen (Select German language)"
                         className="w-full p-4 font-black text-xl bg-white border-4 border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[3px] hover:translate-y-[3px] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all active:shadow-none active:translate-x-[6px] active:translate-y-[6px] hover:bg-yellow-100 focus-ring"
@@ -1597,6 +1797,24 @@ const SettingsModal = ({
     useFocusTrap(showLanguageConfirm, confirmModalRef);
     useEscapeKey(isOpen, handleClose);
 
+    // Focus trap with Escape to close (only when confirmation dialog is not shown)
+    const focusTrapRef = useFocusTrap(isOpen && !showLanguageConfirm, onClose);
+
+    // Focus trap for confirmation dialog
+    const confirmFocusTrapRef = useFocusTrap(showLanguageConfirm, () => {
+        setShowLanguageConfirm(false);
+        setPendingLanguage(null);
+    });
+
+    // Roving tabindex for language buttons
+    const { getItemProps: getLangItemProps } = useRovingTabIndex<HTMLButtonElement>(2, 'horizontal');
+
+    // Roving tabindex for confirmation dialog buttons
+    const { getItemProps: getConfirmItemProps } = useRovingTabIndex<HTMLButtonElement>(2, 'horizontal');
+
+    // Generate unique IDs for ARIA
+    const autoPlayId = useRef(`autoplay-toggle-${Math.random().toString(36).substr(2, 9)}`).current;
+
     if (!isOpen) return null;
 
     const handleLanguageChange = (newLang: 'en' | 'de') => {
@@ -1627,6 +1845,14 @@ const SettingsModal = ({
         setPendingLanguage(null);
     };
 
+    // Handle toggle with keyboard
+    const handleToggleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setAutoPlay(!autoPlay);
+        }
+    };
+
     const t = {
         title: language === 'de' ? 'Einstellungen' : 'Settings',
         languageLabel: language === 'de' ? 'Sprach-Protokoll' : 'Language Protocol',
@@ -1646,6 +1872,13 @@ const SettingsModal = ({
             role="dialog"
             aria-modal="true"
             aria-labelledby="settings-modal-title"
+            onClick={(e) => e.target === e.currentTarget && onClose()}
+        >
+            <div ref={focusTrapRef} className="bg-white wobbly-box p-6 md:p-8 max-w-xs md:max-w-sm w-full relative">
+                 <button
+                    onClick={onClose}
+                    className="absolute top-4 right-4 p-2 hover:bg-gray-100 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    aria-label={t.closeSettings}
         >
             <div
                 ref={modalRef}
@@ -1671,6 +1904,9 @@ const SettingsModal = ({
                     <fieldset className="space-y-2">
                         <legend id={languageGroupId} className="font-bold text-gray-600 block">{t.languageLabel}</legend>
                     <div className="space-y-2">
+                        <label id="language-group-label" className="font-bold text-gray-600 block">{t.languageLabel}</label>
+                        {step === 'result' && (
+                            <div className="text-xs text-amber-600 mb-2 flex items-start gap-1" role="alert">
                         <label className="label text-sm text-gray-600 block">{t.languageLabel}</label>
                         {step === 'result' && (
                             <div className="text-xs text-amber-700 mb-2 flex items-start gap-1" role="alert">
@@ -1678,9 +1914,13 @@ const SettingsModal = ({
                                 <span>{language === 'de' ? 'Sprachwechsel erzeugt neues Ergebnis' : 'Changing language will regenerate result'}</span>
                             </div>
                         )}
+                        <div className="flex gap-2" role="group" aria-labelledby="language-group-label">
                         <div className="flex gap-2" role="radiogroup" aria-labelledby={languageGroupId}>
                             <button
+                                {...getLangItemProps(0)}
                                 onClick={() => handleLanguageChange('en')}
+                                aria-pressed={language === 'en'}
+                                className={`flex-1 p-3 font-bold border-2 transition-all focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 ${
                                 className={`flex-1 p-3 min-h-[48px] font-bold border-2 transition-all ${
                                     language === 'en'
                                     ? 'bg-black text-white border-black transform -rotate-1 shadow-md'
@@ -1697,7 +1937,10 @@ const SettingsModal = ({
                                 English
                             </button>
                             <button
+                                {...getLangItemProps(1)}
                                 onClick={() => handleLanguageChange('de')}
+                                aria-pressed={language === 'de'}
+                                className={`flex-1 p-3 font-bold border-2 transition-all focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 ${
                                 className={`flex-1 p-3 min-h-[48px] font-bold border-2 transition-all ${
                                     language === 'de'
                                     ? 'bg-black text-white border-black transform rotate-1 shadow-md'
@@ -1718,6 +1961,7 @@ const SettingsModal = ({
 
                     {/* Auto Play Toggle */}
                     <div className="flex items-center justify-between">
+                         <label id={autoPlayId} className="font-bold text-gray-600">{t.autoPlayLabel}</label>
                          <label htmlFor={autoPlayId} className="font-bold text-gray-600 cursor-pointer">
                             {t.autoPlayLabel}
                          </label>
@@ -1725,6 +1969,11 @@ const SettingsModal = ({
                          <button
                             id={autoPlayId}
                             onClick={() => setAutoPlay(!autoPlay)}
+                            onKeyDown={handleToggleKeyDown}
+                            role="switch"
+                            aria-checked={autoPlay}
+                            aria-labelledby={autoPlayId}
+                            className={`w-14 h-8 rounded-full border-2 border-black flex items-center px-1 transition-all focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 ${
                             className={`w-14 h-8 min-w-[56px] rounded-full border-2 border-black flex items-center px-1 transition-all ${
                             className={`w-14 h-8 rounded-full border-2 border-black flex items-center px-1 transition-all focus-ring ${
                                 autoPlay ? 'bg-green-400 justify-end' : 'bg-gray-200 justify-start'
@@ -1798,6 +2047,8 @@ const SettingsModal = ({
                              <button
                                 onClick={onPlayAudio}
                                 disabled={isPlaying}
+                                className="w-full p-4 border-2 border-black bg-yellow-300 font-black text-lg shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all flex items-center justify-center gap-2 active:shadow-none active:translate-x-[4px] active:translate-y-[4px] disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2"
+                                aria-live="polite"
                                 className="w-full p-4 min-h-[56px] border-2 border-black bg-yellow-300 font-black text-lg shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all flex items-center justify-center gap-2 active:shadow-none active:translate-x-[4px] active:translate-y-[4px] disabled:opacity-50 disabled:cursor-not-allowed"
                                 aria-label={isPlaying ? t.playing : t.replayAudio}
                                 aria-disabled={isPlaying}
@@ -1824,6 +2075,11 @@ const SettingsModal = ({
                     aria-labelledby="confirm-dialog-title"
                     aria-describedby="confirm-dialog-desc"
                 >
+                    <div ref={confirmFocusTrapRef} className="bg-white wobbly-box p-6 max-w-xs w-full">
+                        <h3 id="confirm-dialog-title" className="text-xl font-black mb-3">
+                            <span aria-hidden="true">⚠️</span> {language === 'de' ? 'Sprache wechseln?' : 'Change Language?'}
+                        </h3>
+                        <p id="confirm-dialog-desc" className="text-gray-700 mb-4 leading-relaxed">
                     <div ref={confirmModalRef} className="bg-white wobbly-box p-6 max-w-xs w-full">
                         <h3 id="confirm-dialog-title" className="text-xl font-black mb-3">
                             <span aria-hidden="true">⚠️ </span>
@@ -1840,16 +2096,20 @@ const SettingsModal = ({
                                 ? 'Das Ergebnis wird neu generiert, um die Antwort und das Audio in der neuen Sprache zu erhalten.'
                                 : 'This will regenerate the result to get the response and audio in the new language.'}
                         </p>
-                        <div className="flex gap-2">
+                        <div className="flex gap-2" role="group">
                             <button
+                                {...getConfirmItemProps(0)}
                                 onClick={cancelLanguageChange}
+                                className="flex-1 p-3 border-2 border-gray-300 text-gray-600 font-bold hover:bg-gray-100 transition-all focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2"
                                 className="flex-1 p-3 min-h-[48px] border-2 border-gray-300 text-gray-700 font-bold hover:bg-gray-100 transition-all"
                                 className="flex-1 p-3 border-2 border-gray-300 text-gray-600 font-bold hover:bg-gray-100 transition-all focus-ring"
                             >
                                 {language === 'de' ? 'Abbrechen' : 'Cancel'}
                             </button>
                             <button
+                                {...getConfirmItemProps(1)}
                                 onClick={confirmLanguageChange}
+                                className="flex-1 p-3 bg-black text-white font-bold border-2 border-black hover:bg-gray-800 transition-all focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2"
                                 className="flex-1 p-3 min-h-[48px] bg-black text-white font-bold border-2 border-black hover:bg-gray-800 transition-all"
                                 className="flex-1 p-3 bg-black text-white font-bold border-2 border-black hover:bg-gray-800 transition-all focus-ring"
                             >
@@ -1882,6 +2142,45 @@ const OnboardingGuide = ({
     language: 'en' | 'de'
 }) => {
     const annotationRef = useRef<any>(null);
+    const nextButtonRef = useRef<HTMLButtonElement>(null);
+    const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+    // Handle keyboard navigation
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            switch (e.key) {
+                case 'Escape':
+                    e.preventDefault();
+                    onClose();
+                    break;
+                case 'Enter':
+                case ' ':
+                    // Only if focused on a non-button element or the container
+                    if (document.activeElement?.tagName !== 'BUTTON') {
+                        e.preventDefault();
+                        onNext();
+                    }
+                    break;
+                case 'ArrowRight':
+                case 'ArrowDown':
+                    e.preventDefault();
+                    onNext();
+                    break;
+                case 'ArrowLeft':
+                case 'ArrowUp':
+                    // Could add previous step if desired
+                    break;
+            }
+        };
+
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [onNext, onClose]);
+
+    // Auto-focus the next button when step changes
+    useEffect(() => {
+        setTimeout(() => nextButtonRef.current?.focus(), 100);
+    }, [step]);
     const guideRef = useRef<HTMLDivElement>(null);
 
     // Focus trap and escape key for the guide
@@ -2003,6 +2302,7 @@ const OnboardingGuide = ({
         }
     };
 
+    const totalSteps = steps.length;
     const closeLabel = language === 'de' ? 'Tour schließen' : 'Close tour';
     const stepLabel = language === 'de'
         ? `Schritt ${step + 1} von ${totalSteps}`
@@ -2013,6 +2313,7 @@ const OnboardingGuide = ({
             className="absolute inset-0 z-50 pointer-events-none flex flex-col items-center justify-center overflow-visible"
             role="dialog"
             aria-modal="true"
+            aria-label={language === 'de' ? `Tour Schritt ${step + 1} von ${totalSteps}` : `Tour step ${step + 1} of ${totalSteps}`}
             aria-label={language === 'de' ? 'Anleitung Tour' : 'Onboarding Tour'}
         >
              {/* Backdrop for step 0 to focus attention */}
@@ -2033,6 +2334,7 @@ const OnboardingGuide = ({
                 <div className="animate-float">
 
                      {/* The Sticky Note Visual: Handles Entrance Animation (Slap) and Interactivity */}
+                     <div className="w-[85vw] max-w-[300px] md:max-w-xs bg-yellow-200 text-black p-5 md:p-6 shadow-xl border-2 border-yellow-400/50 animate-slap origin-center pointer-events-auto mx-4" style={{ borderRadius: '2px 255px 5px 25px / 255px 5px 225px 5px' }}>
                      <div
                         ref={guideRef}
                         className="w-[85vw] max-w-[300px] md:max-w-xs bg-yellow-200 text-black p-5 md:p-6 shadow-xl border-2 border-yellow-400/50 animate-slap origin-center pointer-events-auto mx-4"
@@ -2045,6 +2347,10 @@ const OnboardingGuide = ({
                         <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-24 h-6 bg-white/40 rotate-1" aria-hidden="true"></div>
 
                         <button
+                            ref={closeButtonRef}
+                            onClick={onClose}
+                            className="absolute -top-2 -right-2 bg-white rounded-full p-1 border border-gray-200 hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-400"
+                            aria-label={language === 'de' ? 'Tour schließen' : 'Close tour'}
                             onClick={onClose}
                             className="absolute -top-2 -right-2 bg-white rounded-full p-2 min-w-[36px] min-h-[36px] border border-gray-200 hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors flex items-center justify-center"
                             aria-label={closeLabel}
@@ -2053,6 +2359,25 @@ const OnboardingGuide = ({
                             <X size={16} aria-hidden="true" />
                         </button>
 
+                        <h3 id={`tour-step-${step}-title`} className="font-black text-lg mb-2 flex items-center gap-2">
+                            <span className="bg-black text-white rounded-full w-6 h-6 flex items-center justify-center text-xs shrink-0" aria-hidden="true">{step + 1}</span>
+                            <span className="sr-only">{language === 'de' ? `Schritt ${step + 1}:` : `Step ${step + 1}:`}</span>
+                            {currentStepData.title}
+                        </h3>
+
+                        <p id={`tour-step-${step}-desc`} className="font-hand text-sm md:text-base leading-tight mb-4 text-gray-800">
+                            {currentStepData.text}
+                        </p>
+
+                        <div className="flex justify-between items-center">
+                            <span className="text-xs text-gray-500" aria-hidden="true">
+                                {step + 1}/{totalSteps}
+                            </span>
+                            <button
+                                ref={nextButtonRef}
+                                onClick={onNext}
+                                className="bg-black text-white px-3 py-1.5 md:px-4 md:py-2 font-bold transform rotate-1 hover:-rotate-1 transition-transform flex items-center gap-2 text-xs md:text-sm border-2 border-transparent hover:border-black hover:bg-white hover:text-black focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2"
+                                aria-describedby={`tour-step-${step}-desc`}
                         <h3 id={`tour-step-title-${step}`} className="font-black text-lg mb-2 flex items-center gap-2">
                             <span
                                 className="bg-black text-white rounded-full w-6 h-6 flex items-center justify-center text-xs shrink-0"
@@ -2117,39 +2442,56 @@ const ResultSection = ({
     animationDelay?: number,
     language: 'en' | 'de'
 }) => {
-    const [hovered, setHovered] = useState(false);
+    const [highlighted, setHighlighted] = useState(false);
     const [visible, setVisible] = useState(false);
+    const sectionRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         const timer = setTimeout(() => setVisible(true), animationDelay);
         return () => clearTimeout(timer);
     }, [animationDelay]);
 
+    // Check if any child element has focus (for keyboard navigation highlight)
+    const handleFocusIn = () => setHighlighted(true);
+    const handleFocusOut = (e: React.FocusEvent) => {
+        // Only remove highlight if focus is leaving this section entirely
+        if (!sectionRef.current?.contains(e.relatedTarget as Node)) {
+            setHighlighted(false);
+        }
+    };
+
     return (
-        <div 
+        <div
+            ref={sectionRef}
             className={`relative mt-8 group transition-all duration-500 ease-out ${
-                visible 
-                    ? 'opacity-100 translate-y-0' 
+                visible
+                    ? 'opacity-100 translate-y-0'
                     : 'opacity-0 translate-y-4'
             }`}
             style={{ transitionDelay: `${animationDelay}ms` }}
-            onMouseEnter={() => setHovered(true)}
-            onMouseLeave={() => setHovered(false)}
+            onMouseEnter={() => setHighlighted(true)}
+            onMouseLeave={() => setHighlighted(false)}
+            onFocus={handleFocusIn}
+            onBlur={handleFocusOut}
+            role="region"
+            aria-label={title}
         >
              {/* Header */}
-             <div className={`absolute -top-6 -left-2 ${headerWidth} h-12 z-20 pointer-events-none`}>
+             <div className={`absolute -top-6 -left-2 ${headerWidth} h-12 z-20 pointer-events-none`} aria-hidden="true">
                 <ScribbleHeader text={title} color={color} delay={delay} />
             </div>
 
             {/* Content Box */}
-            <RoughHighlight 
-                show={hovered} 
-                type="box" 
-                color={color} 
-                padding={8} 
-                strokeWidth={2} 
+            <RoughHighlight
+                show={highlighted}
+                type="box"
+                color={color}
+                padding={8}
+                strokeWidth={2}
                 animationDuration={300}
             >
+                <div className={`bg-white/50 border border-gray-200 border-dashed rounded-lg p-5 md:p-6 pt-8 text-lg md:text-xl leading-relaxed text-gray-800 relative transition-all duration-300 group-hover:border-transparent group-hover:bg-transparent group-focus-within:border-transparent group-focus-within:bg-transparent ${
+                    highlighted ? 'transform -translate-y-1 shadow-lg' : ''
                 <div className={`bg-white/50 border border-gray-200 border-dashed rounded-lg p-5 md:p-6 pt-8 text-lg md:text-xl body-lg text-gray-800 relative transition-all duration-300 group-hover:border-transparent group-hover:bg-transparent ${
                     hovered ? 'transform -translate-y-1 shadow-lg' : ''
                 }`}>
@@ -2265,6 +2607,51 @@ const App = () => {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const actionBtnRef = useRef<HTMLButtonElement>(null);
 
+  // Global keyboard shortcuts
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // Ctrl/Cmd + Enter to submit (only when on input screen and input has content)
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && step === 'input' && input.trim()) {
+        e.preventDefault();
+        playClickSound();
+        handleSilencer();
+      }
+
+      // Ctrl/Cmd + M to toggle mic
+      if ((e.ctrlKey || e.metaKey) && e.key === 'm' && step === 'input') {
+        e.preventDefault();
+        toggleRecording();
+      }
+
+      // Ctrl/Cmd + , to open settings
+      if ((e.ctrlKey || e.metaKey) && e.key === ',' && !showSettings && !showLanguageSelect) {
+        e.preventDefault();
+        setShowSettings(true);
+      }
+
+      // Ctrl/Cmd + N for new target (result screen)
+      if ((e.ctrlKey || e.metaKey) && e.key === 'n' && step === 'result') {
+        e.preventDefault();
+        reset();
+      }
+
+      // Ctrl/Cmd + P to play audio (result screen)
+      if ((e.ctrlKey || e.metaKey) && e.key === 'p' && step === 'result' && audioBufferRef.current && !isPlaying) {
+        e.preventDefault();
+        playAudio();
+      }
+    };
+
+    document.addEventListener('keydown', handleGlobalKeyDown);
+    return () => document.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [step, input, showSettings, showLanguageSelect, isPlaying]);
+
+  // Focus input on load
+  useEffect(() => {
+    if (step === 'input' && !showSettings && !showLanguageSelect && tourStep === null) {
+      setTimeout(() => inputRef.current?.focus(), 100);
+    }
+  }, [step, showSettings, showLanguageSelect, tourStep]);
   // Pull to Refresh
   const { pullDistance, isRefreshing, containerRef: pullRefreshRef } = usePullToRefresh(
     () => {
@@ -2922,28 +3309,33 @@ You do not roast the user. You are the user's weapon. The user will paste text f
         <div className="bg-white wobbly-box p-4 md:p-8 relative">
 
             {/* Header Controls */}
-            <div className="absolute top-4 right-4 flex gap-2 z-30">
+            <div className="absolute top-4 right-4 flex gap-2 z-30" role="toolbar" aria-label={language === 'de' ? 'App-Steuerung' : 'App controls'}>
                  {/* Help Button */}
                 <button
                     onClick={() => setTourStep(0)}
+                    className="text-gray-400 hover:text-black hover:scale-110 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-amber-400 rounded-full p-1"
                     className="text-gray-400 hover:text-black hover:scale-110 transition-all duration-300 rounded-full p-1 focus-ring"
                     onClick={() => { playClickSound(); setTourStep(0); }}
                     className="text-gray-400 hover:text-black hover:scale-110 transition-all duration-300"
                     title={language === 'de' ? 'Hilfe & Tour' : 'Help & Tour'}
+                    aria-label={language === 'de' ? 'Hilfe und Tour starten' : 'Start help tour'}
                 >
-                    <HelpCircle size={24} />
+                    <HelpCircle size={24} aria-hidden="true" />
                 </button>
 
                 {/* Settings Button */}
                 <button
                     ref={settingsBtnRef}
                     onClick={() => setShowSettings(true)}
+                    className="text-gray-400 hover:text-black hover:rotate-90 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-amber-400 rounded-full p-1"
+                    title={language === 'de' ? 'Einstellungen (Strg+,)' : 'Settings (Ctrl+,)'}
+                    aria-label={language === 'de' ? 'Einstellungen öffnen' : 'Open settings'}
                     className="text-gray-400 hover:text-black hover:rotate-90 transition-all duration-300 rounded-full p-1 focus-ring"
                     onClick={() => { playClickSound(); setShowSettings(true); }}
                     className="text-gray-400 hover:text-black hover:rotate-90 transition-all duration-300"
                     title={language === 'de' ? 'Einstellungen' : 'Settings'}
                 >
-                    <Settings size={24} />
+                    <Settings size={24} aria-hidden="true" />
                 </button>
             </div>
 
@@ -3046,6 +3438,18 @@ You do not roast the user. You are the user's weapon. The user will paste text f
                                     onChange={(e) => setInput(e.target.value)}
                                     onFocus={() => setInputFocused(true)}
                                     onBlur={() => setInputFocused(false)}
+                                    onKeyDown={(e) => {
+                                        // Ctrl/Cmd + Enter to submit
+                                        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && input.trim()) {
+                                            e.preventDefault();
+                                            playClickSound();
+                                            handleSilencer();
+                                        }
+                                    }}
+                                    className={`w-full h-40 wobbly-input p-4 pb-12 text-lg md:text-xl bg-gray-50 focus:bg-white focus:ring-0 outline-none resize-none font-hand text-gray-800 leading-normal shadow-inner placeholder:text-gray-300 relative z-10 transition-all duration-300 focus:ring-2 focus:ring-amber-400 ${inputFocused ? 'scale-[1.01] shadow-lg' : ''}`}
+                                    placeholder={language === 'de' ? "z.B. 'Eigentlich ist HTML eine Programmiersprache'" : "e.g. 'Actually, HTML is a programming language'"}
+                                    aria-label={language === 'de' ? 'Text zum Analysieren eingeben' : 'Enter text to analyze'}
+                                    aria-describedby="input-hint"
                                     className={`w-full h-40 wobbly-input p-4 pb-12 text-lg md:text-xl bg-gray-50 focus:bg-white focus:ring-0 outline-none resize-none font-hand text-gray-800 leading-normal shadow-inner placeholder:text-gray-400 relative z-10 transition-all duration-300 ${inputFocused ? 'scale-[1.01] shadow-lg' : ''}`}
                                     className={`w-full h-40 wobbly-input p-4 pb-12 text-lg md:text-xl body-lg bg-gray-50 focus:bg-white focus:ring-0 outline-none resize-none font-hand text-gray-800 shadow-inner placeholder:text-gray-300 relative z-10 transition-all duration-300 ${inputFocused ? 'scale-[1.01] shadow-lg' : ''}`}
                                     placeholder={language === 'de' ? "z.B. 'Eigentlich ist HTML eine Programmiersprache'" : "e.g. 'Actually, HTML is a programming language'"}
@@ -3054,8 +3458,14 @@ You do not roast the user. You are the user's weapon. The user will paste text f
                                 />
                             </RoughHighlight>
 
+                            {/* Screen reader hint */}
+                            <span id="input-hint" className="sr-only">
+                                {language === 'de' ? 'Strg+Enter zum Absenden, Strg+M für Mikrofon' : 'Press Ctrl+Enter to submit, Ctrl+M for microphone'}
+                            </span>
+
                             <button
                                 onClick={toggleRecording}
+                                className={`absolute bottom-3 right-3 p-2 rounded-full transition-all duration-300 z-20 focus:outline-none focus:ring-2 focus:ring-amber-400 ${
                                 className={`absolute bottom-3 right-3 p-3 min-w-[44px] min-h-[44px] rounded-full transition-all duration-300 z-20 flex items-center justify-center ${
                                     isRecording
                                     ? "text-red-500 animate-pulse bg-red-50"
@@ -3067,6 +3477,10 @@ You do not roast the user. You are the user's weapon. The user will paste text f
                                     ? "text-red-500 animate-pulse bg-red-50"
                                     : "text-gray-400/50 hover:text-gray-600 hover:opacity-100 hover:bg-gray-100"
                                 }`}
+                                title={language === 'de' ? 'Spracheingabe umschalten (Strg+M)' : 'Toggle voice input (Ctrl+M)'}
+                                aria-label={isRecording
+                                    ? (language === 'de' ? 'Aufnahme stoppen' : 'Stop recording')
+                                    : (language === 'de' ? 'Spracheingabe starten' : 'Start voice input')
                                 aria-label={isRecording
                                     ? (language === 'de' ? 'Sprachaufnahme beenden' : 'Stop voice recording')
                                     : (language === 'de' ? 'Sprachaufnahme starten' : 'Start voice recording')
@@ -3112,7 +3526,11 @@ You do not roast the user. You are the user's weapon. The user will paste text f
                         onClick={() => { playClickSound(); triggerHaptic('medium'); handleSilencer(); }}
                         onMouseEnter={() => setBtnHovered(true)}
                         onMouseLeave={() => setBtnHovered(false)}
+                        onFocus={() => setBtnHovered(true)}
+                        onBlur={() => setBtnHovered(false)}
                         disabled={!input.trim()}
+                        className="w-full wobbly-box bg-red-400 px-8 py-4 text-2xl md:text-3xl font-black flex items-center justify-center gap-3 hover:bg-red-500 text-white disabled:opacity-50 disabled:cursor-not-allowed transform hover:-translate-y-1 hover:scale-[1.02] active:scale-95 active:translate-y-1 transition-all duration-150 mt-2 focus:outline-none focus:ring-4 focus:ring-amber-400 focus:ring-offset-2"
+                        aria-describedby="submit-hint"
                         className="w-full wobbly-box bg-red-400 px-8 py-4 text-2xl md:text-3xl font-black flex items-center justify-center gap-3 hover:bg-red-500 text-white disabled:opacity-50 disabled:cursor-not-allowed transform hover:-translate-y-1 hover:scale-[1.02] active:scale-95 active:translate-y-1 transition-all duration-150 mt-2 touch-feedback"
                         className="w-full wobbly-box bg-red-400 px-8 py-4 text-2xl md:text-3xl font-black flex items-center justify-center gap-3 hover:bg-red-500 text-white disabled:opacity-50 disabled:cursor-not-allowed transform hover:-translate-y-1 hover:scale-[1.02] active:scale-[0.96] active:translate-y-1 transition-all duration-150 mt-2 btn-press animate-bounce-in"
                         style={{ animationDelay: '0.15s', opacity: 0, animationFillMode: 'forwards' }}
@@ -3120,8 +3538,13 @@ You do not roast the user. You are the user's weapon. The user will paste text f
                             {language === 'de' ? "Bullshit Analysieren" : "Analyse Bullshit"}
                         </LoadingButton>
                     </RoughHighlight>
+                    <span id="submit-hint" className="sr-only">
+                        {language === 'de' ? 'Oder Strg+Enter drücken' : 'Or press Ctrl+Enter'}
+                    </span>
 
                     {error && (
+                        <div role="alert" className="wobbly-box bg-red-100 p-4 flex items-center gap-3 text-red-600 text-xl font-bold rotate-1 animate-bounce">
+                            <Coffee size={24} aria-hidden="true" /> {error}
                         <ErrorDisplay
                             error={error}
                             onDismiss={() => setError("")}
@@ -3182,6 +3605,11 @@ You do not roast the user. You are the user's weapon. The user will paste text f
             )}
 
             {step === 'result' && (
+                <div className="animate-crossfade" role="region" aria-label={language === 'de' ? 'Analyse-Ergebnis' : 'Analysis result'}>
+                    <div className="flex justify-between items-center mb-6 border-b-2 border-dashed border-gray-300 pb-2">
+                        <div className="flex items-center gap-2 text-2xl font-black text-gray-400 uppercase">
+                            <Receipt size={24} aria-hidden="true" />
+                            <span className="tracking-widest">{language === 'de' ? 'QUITTUNG' : 'RECEIPT'}</span>
                 <section className="animate-crossfade" aria-label={language === 'de' ? 'Analyseergebnis' : 'Analysis result'}>
                     <div className="flex justify-between items-center mb-6 border-b-2 border-dashed border-gray-300 pb-2">
                         <div className="flex items-center gap-2 text-2xl font-black text-gray-500 uppercase">
@@ -3230,6 +3658,12 @@ You do not roast the user. You are the user's weapon. The user will paste text f
                                 <PenTool size={16} className="group-hover:rotate-12 transition-transform" aria-hidden="true" />
                                     onClick={() => { playClickSound(); playAudio(); }}
                                     disabled={isPlaying}
+                                    title={isPlaying ? (language === 'de' ? 'Spricht... (Strg+P)' : 'Speaking... (Ctrl+P)') : (language === 'de' ? 'Anhören (Strg+P)' : 'Listen (Ctrl+P)')}
+                                    aria-label={isPlaying
+                                        ? (language === 'de' ? 'Audio wird abgespielt' : 'Audio is playing')
+                                        : (language === 'de' ? 'Audio abspielen' : 'Play audio')
+                                    }
+                                    className={`p-2 rounded-full border-2 transition-all focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 ${
                                     title={isPlaying ? (language === 'de' ? 'Spricht...' : 'Speaking...') : (language === 'de' ? 'Anhören' : 'Listen')}
                                     className={`p-2 rounded-full border-2 transition-all focus-ring ${
                                         isPlaying
@@ -3240,6 +3674,18 @@ You do not roast the user. You are the user's weapon. The user will paste text f
                                             ? 'border-green-500 text-green-700 bg-green-50'
                                             : 'border-black text-black hover:bg-yellow-100 active:scale-95'
                                     }`}
+                                    aria-live="polite"
+                                >
+                                    <Volume2 size={24} className={isPlaying ? "animate-pulse" : ""} aria-hidden="true" />
+                                </button>
+                             )}
+
+                            <button
+                                onClick={reset}
+                                className="text-gray-400 hover:text-black font-bold underline decoration-wavy flex items-center gap-1 group focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 rounded"
+                                title={language === 'de' ? 'Neues Opfer (Strg+N)' : 'New Target (Ctrl+N)'}
+                            >
+                                <PenTool size={16} className="group-hover:rotate-12 transition-transform" aria-hidden="true" />
                                     style={{ animationDelay: '0.15s', opacity: 0, animationFillMode: 'forwards' }}
                                 >
                                     <Volume2 size={24} className={isPlaying ? "animate-bounce" : ""} />
