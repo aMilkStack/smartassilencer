@@ -640,18 +640,18 @@ const LanguageSelectionModal = ({
 // Sarcasm level labels
 const SARCASM_LEVELS = {
     en: [
-        { level: 1, label: "Mildly Annoyed", emoji: "😒", desc: "Polite disappointment" },
-        { level: 2, label: "Eye Roll", emoji: "🙄", desc: "Passive-aggressive sighing" },
-        { level: 3, label: "Properly British", emoji: "☕", desc: "Dry wit & backhanded compliments" },
-        { level: 4, label: "Savage", emoji: "🔥", desc: "No mercy, no survivors" },
-        { level: 5, label: "Nuclear", emoji: "☢️", desc: "Verbal war crimes" }
+        { level: 1, label: "Mildly Annoyed", desc: "Polite disappointment" },
+        { level: 2, label: "Eye Roll", desc: "Passive-aggressive sighing" },
+        { level: 3, label: "Properly British", desc: "Dry wit & backhanded compliments" },
+        { level: 4, label: "Savage", desc: "No mercy, no survivors" },
+        { level: 5, label: "Nuclear", desc: "Verbal war crimes" }
     ],
     de: [
-        { level: 1, label: "Leicht Genervt", emoji: "😒", desc: "Höfliche Enttäuschung" },
-        { level: 2, label: "Augenrollen", emoji: "🙄", desc: "Passiv-aggressives Seufzen" },
-        { level: 3, label: "Typisch Deutsch", emoji: "🍺", desc: "Bürokratische Verachtung" },
-        { level: 4, label: "Brutal", emoji: "🔥", desc: "Keine Gnade, keine Überlebenden" },
-        { level: 5, label: "Atomar", emoji: "☢️", desc: "Verbale Kriegsverbrechen" }
+        { level: 1, label: "Leicht Genervt", desc: "Höfliche Enttäuschung" },
+        { level: 2, label: "Augenrollen", desc: "Passiv-aggressives Seufzen" },
+        { level: 3, label: "Typisch Deutsch", desc: "Bürokratische Verachtung" },
+        { level: 4, label: "Brutal", desc: "Keine Gnade, keine Überlebenden" },
+        { level: 5, label: "Atomar", desc: "Verbale Kriegsverbrechen" }
     ]
 };
 
@@ -809,15 +809,15 @@ const SettingsModal = ({
                                 className="absolute top-1/2 -translate-y-1/2 pointer-events-none transition-all duration-150"
                                 style={{ left: `calc(${((sarcasmLevel - 1) / 4) * 100}% - ${sarcasmLevel === 1 ? '0px' : sarcasmLevel === 5 ? '24px' : '12px'})` }}
                             >
-                                <div className="w-6 h-6 bg-white border-2 border-black rounded-full shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] flex items-center justify-center text-xs">
-                                    {SARCASM_LEVELS[language][sarcasmLevel - 1].emoji}
+                                <div className="w-6 h-6 bg-white border-2 border-black rounded-full shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] flex items-center justify-center text-xs font-black">
+                                    {sarcasmLevel}
                                 </div>
                             </div>
                         </div>
                         {/* Level display */}
                         <div className="text-center">
                             <div className="text-lg font-black">
-                                {SARCASM_LEVELS[language][sarcasmLevel - 1].emoji} {SARCASM_LEVELS[language][sarcasmLevel - 1].label}
+                                {sarcasmLevel}/5 — {SARCASM_LEVELS[language][sarcasmLevel - 1].label}
                             </div>
                             <div className="text-xs text-gray-500 italic">
                                 {SARCASM_LEVELS[language][sarcasmLevel - 1].desc}
