@@ -36,5 +36,5 @@ jobs:
             PR_URL=$(gh pr view "$BRANCH_NAME" --json url -q .url)
           fi
 
-          # Merge the PR
-          gh pr merge "$BRANCH_NAME" --merge --auto --delete-branch
+          # Merge the PR immediately
+          gh pr merge "$BRANCH_NAME" --merge --delete-branch
