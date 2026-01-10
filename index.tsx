@@ -1643,7 +1643,7 @@ const SettingsModal = ({
     onStartPong: () => void;
     triggerRef: React.RefObject<HTMLButtonElement | null>;
 }) => {
-    const [openSection, setOpenSection] = useState<string | null>('language');
+    const [openSection, setOpenSection] = useState<string | null>(null);
     const [showLanguageConfirm, setShowLanguageConfirm] = useState(false);
     const [showClearDataConfirm, setShowClearDataConfirm] = useState(false);
     const [pendingLanguage, setPendingLanguage] = useState<'en' | 'de' | null>(null);
