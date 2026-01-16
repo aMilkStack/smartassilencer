@@ -2184,7 +2184,7 @@ const SettingsModal = ({
 
                             {/* Report Issue */}
                             <a
-                                href="https://github.com/aMilkStack/smartassilencer/issues"
+                                href="https://github.com/aMilkStack/the-smart-ass-silencer/issues"
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="flex items-center justify-between p-3 border-2 border-gray-200 rounded hover:border-black transition-colors"
